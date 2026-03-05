@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+const User = require('./models/User');
+const bcrypt = require('bcrypt')
+
 
 const { connectDB, PORT } = require('./config/db');
 const authRoutes = require('./routes/auth');
@@ -38,13 +41,35 @@ app.use((err, req, res, next) => {
     });
 });
 
+const seedSuperAdmin = async () => {
+    const adminExist = await User.findOne({ role: "SuperAdmin" })
+
+    if (!adminExist) {
+        const hashedPassword = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, 10);
+
+        await User.create({
+            fullName: "System SuperAdmin",
+            employeeId: "SUPER001",
+            email: process.env.SUPER_ADMIN_EMAIL,
+            department: "Finance and Admin Unit",
+            password: process.env.SUPER_ADMIN_PASSWORD,
+            role: "SuperAdmin"
+        });
+        console.log("Super Admin Created!")
+    }
+}
+
+
 // Import mongoose for connection checking
 const mongoose = require('mongoose');
 
-// Start server after connecting to DB
+// Start server after connecting to     
 const startServer = async () => {
     try {
         await connectDB();
+
+        await seedSuperAdmin()
+
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
             console.log(`MongoDB connection state: ${mongoose.connection.readyState}`);
@@ -54,5 +79,7 @@ const startServer = async () => {
         process.exit(1);
     }
 };
+
+
 
 startServer();

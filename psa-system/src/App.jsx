@@ -1,155 +1,241 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import './App.css'
 import Sidebar from './Components/Sidebar'
-import Dashboard from './Components/Dashboard'
-import ListOfSupplies from './Components/ListOfSupplies'
-import RequestForm from './Components/RequestForm'
-import History from './Components/History'
+import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard'
+import EmployeeDashboard from './pages/employee/EmployeeDashboard'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import ListOfSupplies from './pages/superadmin/ListOfSupplies'
+import ApproveRequests from './pages/admin/ApproveRequests'
 import Profile from './Components/Profile'
-import Login from './Components/Login'
-import SignIn from './Components/SignIn'
+import Login from './pages/auth/Login'
+import SignIn from './pages/auth/SignIn'
+import Navbar from './Components/Navbar'
+import UserManagement from './pages/superadmin/UserManagement'
+import MyRequests from './pages/employee/MyRequests'
+
+// Sidebar menu configuration based on role
+const sidebarMenus = {
+  SuperAdmin: ["Dashboard", "Supplies", "User Management"],
+  Admin: ["Dashboard", "Requisitions", "Supplies"],
+  Employee: ["Dashboard", "MyRequests"]
+};
 
 // MainContent component declared outside of App
-function MainContent({ currentView, sidebarExpanded, toggleSidebar, handleLogout, supplies, setSupplies, historyData, setHistoryData, setCurrentView }) {
-  const renderContent = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard totalSupplies={supplies.length} />
-      case 'supplies':
-        return <ListOfSupplies supplies={supplies} setSupplies={setSupplies} />
-      case 'request':
-        return <RequestForm onRequestSubmit={setHistoryData} />
-      case 'history':
-        return <History historyData={historyData} />
-      case 'settings':
-        return <Profile />
-      default:
-        return <Dashboard totalSupplies={supplies.length} />
-    }
-  }
+function MainContent({
+  currentView,
+  sidebarExpanded,
+  toggleSidebar,
+  handleLogout,
+  supplies,
+  setSupplies,
+  setCurrentView,
+  user,
+  menuItems
+}) {
+  // Debug props
+  useEffect(() => {
+    console.log('🔄 MainContent received:', { user, menuItems, currentView });
+  }, [user, menuItems, currentView]);
 
+  const renderContent = () => {
+    const userRole = user?.role || 'Employee';
+    console.log('🎯 Rendering for role:', userRole, 'View:', currentView);
+
+    switch (currentView) {
+      case 'Dashboard':
+        // Return different dashboard based on role
+        if (userRole === 'SuperAdmin') {
+          return <SuperAdminDashboard
+            totalSupplies={supplies?.length || 0}
+            userRole={userRole}
+            user={user}
+          />;
+        } else if (userRole === 'Admin') {
+          return <AdminDashboard user={user} />;
+        } else {
+          return <EmployeeDashboard user={user} />;
+        }
+
+      case 'Supplies':
+        return <ListOfSupplies
+          supplies={supplies || []}
+          setSupplies={setSupplies}
+          userRole={userRole}
+        />;
+
+      case 'User Management':
+        return userRole === 'SuperAdmin' ? <UserManagement /> : <Navigate to="/dashboard" />;
+
+      case 'Requisitions':
+        return userRole === 'Admin' ? <ApproveRequests /> : <Navigate to="/dashboard" />;
+
+      case 'MyRequests':
+        return userRole === 'Employee' ? <MyRequests user={user} /> : <Navigate to="/dashboard" />;
+
+      case 'Profile':
+        return <Profile user={user} />;
+
+      default:
+        if (userRole === 'SuperAdmin') {
+          return <SuperAdminDashboard
+            totalSupplies={supplies?.length || 0}
+            userRole={userRole}
+            user={user}
+          />;
+        } else if (userRole === 'Admin') {
+          return <AdminDashboard user={user} />;
+        } else {
+          return <EmployeeDashboard user={user} />;
+        }
+    }
+  };
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ display: 'flex' }}>
       <Sidebar
+        menuItems={menuItems}
         onViewChange={setCurrentView}
         currentView={currentView}
         sidebarExpanded={sidebarExpanded}
         toggleSidebar={toggleSidebar}
         onLogout={handleLogout}
+        userRole={user?.role}
       />
-      <div className="main-content">
+      <div className="main-content" style={{ flex: 1, marginLeft: sidebarExpanded ? '250px' : '70px', transition: 'margin-left 0.3s' }}>
+        <Navbar
+          user={user}
+          onLogout={handleLogout}
+          onViewChange={setCurrentView}
+          menuItems={menuItems}
+        />
         {renderContent()}
       </div>
     </div>
-  )
+  );
 }
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [currentView, setCurrentView] = useState('dashboard')
-  const [sidebarExpanded, setSidebarExpanded] = useState(true)
-  const [historyData, setHistoryData] = useState([
-    {
-      id: 1,
-      requester: 'Nicole Young',
-      department: 'Admin Department',
-      date: '2024-01-15',
-      type: 'Request',
-      items: [
-        { name: 'Laptop', quantity: 2, status: 'Approved' },
-        { name: 'Mouse', quantity: 5, status: 'Approved' }
-      ],
-      status: 'Completed'
-    },
-    {
-      id: 2,
-      requester: 'Jasmine',
-      department: 'HR Department',
-      date: '2024-01-14',
-      type: 'Request',
-      items: [
-        { name: 'Printer Paper', quantity: 10, status: 'Pending' }
-      ],
-      status: 'Pending'
-    },
-    {
-      id: 3,
-      requester: 'JM',
-      department: 'Finance Department',
-      date: '2024-01-13',
-      type: 'Return',
-      items: [
-        { name: 'Calculator', quantity: 1, status: 'Completed' }
-      ],
-      status: 'Completed'
-    },
-    {
-      id: 4,
-      requester: 'Ella',
-      department: 'Finance Department',
-      date: '2024-01-12',
-      type: 'Request',
-      items: [
-        { name: 'Projector', quantity: 1, status: 'Approved' },
-        { name: 'Whiteboard Markers', quantity: 20, status: 'Approved' }
-      ],
-      status: 'Completed'
-    },
-    {
-      id: 5,
-      requester: 'Daryll',
-      department: 'Statistical Department',
-      date: '2024-01-11',
-      type: 'Request',
-      items: [
-        { name: 'Safety Gloves', quantity: 50, status: 'Approved' }
-      ],
-      status: 'Completed'
-    }
-  ])
-  const [supplies, setSupplies] = useState([
-    {
-      id: 1,
-      name: 'Pens',
-      unit: 'Office Supplies',
-      unitPrice: 1.50,
-      totalAmount: 150.00,
-      inventoryDec31: 100,
-      adjustments: 0,
-      totalInventory: 100,
-      issuances: 0,
-      balances: 100,
-    },
-    {
-      id: 2,
-      name: 'Paper',
-      unit: 'Office Supplies',
-      unitPrice: 5.00,
-      totalAmount: 2500.00,
-      inventoryDec31: 500,
-      adjustments: 0,
-      totalInventory: 500,
-      issuances: 0,
-      balances: 500,
-    },
-    {
-      id: 3,
-      name: 'Cleaning Spray',
-      unit: 'Cleaning Supplies',
-      unitPrice: 3.00,
-      totalAmount: 150.00,
-      inventoryDec31: 50,
-      adjustments: 0,
-      totalInventory: 50,
-      issuances: 0,
-      balances: 50,
-    },
-  ])
+  // Debug initial load
+  console.log('🚀 App initializing...');
 
-  const handleLogin = (email, role) => {
+  // Authentication state
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    console.log('🔑 Initial auth check - Token:', !!token, 'User:', !!user);
+    return !!(token && user);
+  });
+
+  // User state
+  const [user, setUser] = useState(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        console.log('👤 Initial user from localStorage:', parsed);
+        return parsed;
+      } catch (e) {
+        console.error('❌ Error parsing user:', e);
+        return null;
+      }
+    }
+    return null;
+  });
+
+  // UI state
+  const [currentView, setCurrentView] = useState('Dashboard')
+  const [sidebarExpanded, setSidebarExpanded] = useState(true)
+
+  // Data state - initialized as empty arrays
+  const [supplies, setSupplies] = useState([])
+  const [users, setUsers] = useState([])
+  const [requisitions, setRequisitions] = useState([])
+
+  // Get menu items based on user role
+  const [menuItems, setMenuItems] = useState([])
+
+  // Debug effect to log state changes
+  useEffect(() => {
+    console.log('📊 App state updated:', {
+      isLoggedIn,
+      user: user ? { ...user, password: undefined } : null,
+      userRole: user?.role,
+      menuItems,
+      currentView,
+      suppliesCount: supplies.length
+    });
+  }, [isLoggedIn, user, menuItems, currentView, supplies]);
+
+  // Update menu items when user changes
+  useEffect(() => {
+    if (user?.role) {
+      console.log('🎯 Updating menu for role:', user.role);
+      console.log('📋 Available menus:', sidebarMenus);
+
+      const items = sidebarMenus[user.role] || sidebarMenus.employee;
+      console.log('✅ Selected menu items:', items);
+
+      setMenuItems(items);
+
+      // Set default view based on role
+      if (!items.includes(currentView)) {
+        console.log('🔄 Setting default view to:', items[0]);
+        setCurrentView(items[0]);
+      }
+    } else {
+      console.log('⚠️ No user role found, clearing menu items');
+      setMenuItems([]);
+    }
+  }, [user]);
+
+  // Load user data from localStorage on mount
+  useEffect(() => {
+    const loadUserData = () => {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        try {
+          const parsed = JSON.parse(userData);
+          console.log('📦 Loading user from localStorage:', parsed);
+          setUser(parsed);
+        } catch (e) {
+          console.error('❌ Error parsing user from localStorage:', e);
+        }
+      }
+
+      // These should ideally come from API, not localStorage
+      const savedSupplies = localStorage.getItem('supplies');
+      if (savedSupplies) {
+        setSupplies(JSON.parse(savedSupplies));
+      }
+
+      const savedUsers = localStorage.getItem('users');
+      if (savedUsers) {
+        setUsers(JSON.parse(savedUsers));
+      }
+
+      const savedRequisitions = localStorage.getItem('requisitions');
+      if (savedRequisitions) {
+        setRequisitions(JSON.parse(savedRequisitions));
+      }
+    };
+
+    if (isLoggedIn) {
+      loadUserData();
+    }
+  }, [isLoggedIn]);
+
+  const handleLogin = (userData, token) => {
+    console.log('🔐 handleLogin called with userData:', userData);
+    console.log('🎭 User role:', userData.role);
+
+    // Save to localStorage
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+
+    // Update state
     setIsLoggedIn(true);
-    console.log(`[APP] User logged in: ${email} with role: ${role}`);
+    setUser(userData);
+
+    console.log(`✅ User logged in: ${userData.email} with role: ${userData.role}`);
   }
 
   const toggleSidebar = () => {
@@ -157,33 +243,69 @@ function App() {
   }
 
   const handleLogout = () => {
+    console.log('👋 Logging out...');
+    // Clear all localStorage
+    localStorage.clear();
     setIsLoggedIn(false);
+    setUser(null);
+    setMenuItems([]);
+    setCurrentView('Dashboard');
+    console.log('✅ Logout complete, localStorage cleared');
   }
+
+  // Remove these localStorage saves if data should come from API
+  useEffect(() => {
+    if (supplies.length > 0) {
+      localStorage.setItem('supplies', JSON.stringify(supplies));
+    }
+  }, [supplies]);
+
+  useEffect(() => {
+    if (users.length > 0) {
+      localStorage.setItem('users', JSON.stringify(users));
+    }
+  }, [users]);
+
+  useEffect(() => {
+    if (requisitions.length > 0) {
+      localStorage.setItem('requisitions', JSON.stringify(requisitions));
+    }
+  }, [requisitions]);
 
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<Login onLogin={handleLogin} />} />
-        <Route path="/signup" element={<SignIn />} />
+        <Route
+          path="/login"
+          element={<Login onLogin={handleLogin} />}
+        />
+        <Route
+          path="/signup"
+          element={<SignIn />}
+        />
         <Route
           path="/*"
-          element={isLoggedIn ? (
-            <MainContent
-              currentView={currentView}
-              sidebarExpanded={sidebarExpanded}
-              toggleSidebar={toggleSidebar}
-              handleLogout={handleLogout}
-              supplies={supplies}
-              setSupplies={setSupplies}
-              historyData={historyData}
-              setHistoryData={setHistoryData}
-              setCurrentView={setCurrentView}
-            />
-          ) : <Navigate to="/login" />}
+          element={
+            isLoggedIn ? (
+              <MainContent
+                currentView={currentView}
+                sidebarExpanded={sidebarExpanded}
+                toggleSidebar={toggleSidebar}
+                handleLogout={handleLogout}
+                supplies={supplies}
+                setSupplies={setSupplies}
+                setCurrentView={setCurrentView}
+                user={user}
+                menuItems={menuItems}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
       </Routes>
     </Router>
   )
 }
 
-export default App
+export default App;

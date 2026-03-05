@@ -1,15 +1,35 @@
-import React, { useState } from 'react';
-import AddNewSupply from './AddNewSupply';
-import GenerateReport from './GenerateReport';
-import History from './History';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import './Dashboard.css';  // Add this import
 
 const Dashboard = ({ totalSupplies }) => {
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-
-  // Calendar state
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+
+    if (!userData || !token) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      navigate('/login');
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
 
   const getDaysInMonth = (year, month) => {
     return new Date(year, month + 1, 0).getDate();
@@ -36,12 +56,10 @@ const Dashboard = ({ totalSupplies }) => {
 
     const days = [];
 
-    // Empty slots for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
       days.push(<span key={`empty-${i}`} className="date empty"></span>);
     }
 
-    // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const isToday =
         day === new Date().getDate() &&
@@ -63,58 +81,70 @@ const Dashboard = ({ totalSupplies }) => {
 
   const { days, monthName, year } = renderCalendar();
 
+  if (loading) {
+    return <div className="loading">Loading dashboard...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   return (
     <>
       {isModalOpen && <AddNewSupply isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />}
       {isReportModalOpen && <GenerateReport isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />}
       {isHistoryModalOpen && <History onClose={() => setIsHistoryModalOpen(false)} />}
+
       <div className="dashboard">
         <div className="dashboard-header">
-          <h1>Welcome back, Ma'am Ella!</h1>
+          <h1>{getGreeting()}, {user.fullName}!</h1>
           <p>Here's what's happening with your system today.</p>
         </div>
 
         <div className="dashboard-cards">
           <div className="card card-supplies">
-            <div className="card-icon"></div>
+            <div className="card-icon">📦</div>
             <div className="card-content">
               <h3>Total Supplies</h3>
-              <div className="card-value">{totalSupplies}</div>
+              <div className="card-value">{totalSupplies || 0}</div>
               <div className="card-change positive">+12% from last month</div>
             </div>
           </div>
+
           <div className="card card-activities">
-            <div className="card-icon"></div>
+            <div className="card-icon">📊</div>
             <div className="card-content">
               <h3>Recent Activities</h3>
               <div className="card-value">5</div>
               <div className="card-change">New entries today</div>
             </div>
           </div>
-          <div className="card card-status">
-            <div className="card-icon"></div>
-            <div className="card-content">
-              <h3>System Status</h3>
-              <div className="card-value">Online</div>
-              <div className="card-change">All systems operational</div>
+
+          {(user.role === 'Admin' || user.role === 'Approver') && (
+            <div className="card card-pending">
+              <div className="card-icon">⏳</div>
+              <div className="card-content">
+                <h3>Pending Requests</h3>
+                <div className="card-value">3</div>
+                <div className="card-change">Awaiting approval</div>
+              </div>
             </div>
-          </div>
+          )}
+
           <div className="card card-alerts">
-            <div className="card-icon"></div>
+            <div className="card-icon">⚠️</div>
             <div className="card-content">
               <h3>Low Stock Alerts</h3>
               <div className="card-value">2</div>
               <div className="card-change">Items need restocking</div>
             </div>
-          </div>
-        </div>
-
-        <div className="quick-actions">
-          <h2>Quick Actions</h2>
-          <div className="action-buttons">
-            <button onClick={() => setIsModalOpen(true)}>Add New Supply</button>
-            <button onClick={() => setIsReportModalOpen(true)}>Generate Report</button>
-            <button onClick={() => setIsHistoryModalOpen(true)}>View History</button>
           </div>
         </div>
 
@@ -173,6 +203,5 @@ const Dashboard = ({ totalSupplies }) => {
     </>
   );
 };
-
 
 export default Dashboard;

@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const { JWT_SECRET } = require('../config/db');
 
 const auth = async (req, res, next) => {
@@ -14,7 +15,14 @@ const auth = async (req, res, next) => {
             : authHeader;
 
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
+
+        const user = await User.findById(decoded.id).select('-password');
+
+        if (!user) {
+            return res.status(401).json({ message: 'User not found' });
+        }
+
+        req.user = user; // full user object
         next();
     } catch (error) {
         console.error('Auth error:', error);

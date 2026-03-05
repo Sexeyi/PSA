@@ -1,47 +1,55 @@
 import React from 'react';
-import Logout from './Logout';
+import Logo from '../assets/psa.png';
+import './Sidebar.css';
 
-const Sidebar = ({ onViewChange, currentView, onLogout }) => {
+const Sidebar = ({
+  onViewChange,
+  currentView,
+  menuItems = [],
+  userRole
+}) => {
   const handleMenuClick = (view) => {
     onViewChange(view);
   };
 
+  // Icon mapping for menu items
+  const getIcon = (item) => {
+    const icons = {
+      'Dashboard': '📊',
+      'System Settings': '⚙️',
+      'Users': '👥',
+      'Department Users': '👤',
+      'Requisitions': '📝',
+      'Supplies': '📦',
+      'My Requests': '📋'
+    };
+    return icons[item] || '📌';
+  };
+
   return (
     <div className="sidebar">
-      <h2>PSA</h2>
-      <ul>
-        <li
-          className={currentView === 'dashboard' ? 'active' : ''}
-          onClick={() => handleMenuClick('dashboard')}
-        >
-          Dashboard
-        </li>
-        <li
-          className={currentView === 'supplies' ? 'active' : ''}
-          onClick={() => handleMenuClick('supplies')}
-        >
-          Supplies
-        </li>
-        <li
-          className={currentView === 'request' ? 'active' : ''}
-          onClick={() => handleMenuClick('request')}
-        >
-          Request
-        </li>
-        <li
-          className={currentView === 'history' ? 'active' : ''}
-          onClick={() => handleMenuClick('history')}
-        >
-          History
-        </li>
-        <li
-          className={currentView === 'settings' ? 'active' : ''}
-          onClick={() => handleMenuClick('settings')}
-        >
-          Profile
-        </li>
-        <li className="logout-btn" onClick={onLogout}>Logout</li>
+      <div className="psa-logo-container">
+        <img src={Logo} alt="PSA Logo" className="psa-logo" />
+      </div>
+
+      <ul className="sidebar-menu">
+        {menuItems.map((item) => (
+          <li
+            key={item}
+            className={currentView === item ? 'active' : ''}
+            onClick={() => handleMenuClick(item)}
+          >
+            <span className="menu-icon">{getIcon(item)}</span>
+            <span className="menu-text">{item}</span>
+          </li>
+        ))}
       </ul>
+
+      {userRole && (
+        <div className="sidebar-footer">
+          <span className="user-role">{userRole}</span>
+        </div>
+      )}
     </div>
   );
 };

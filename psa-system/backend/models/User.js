@@ -32,8 +32,8 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['Admin', 'Approver', 'Requester'],
-        default: 'Requester'
+        enum: ['SuperAdmin', 'Admin', 'Approver', 'Employee'],
+        default: 'Employee'
     },
     password: {
         type: String,
@@ -49,14 +49,26 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-// Hash password before saving
-userSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) return next();
 
+userSchema.pre('save', async function (next) {
     try {
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
+        // Enforce single SuperAdmin
+        if (this.role === 'SuperAdmin') {
+            const existingSuperAdmin = await this.constructor.findOne({ role: 'SuperAdmin' });
+            if (existingSuperAdmin && existingSuperAdmin._id.toString() !== this._id.toString()) {
+                return next(new Error('There can only be one SuperAdmin'));
+            }
+        }
+
+        // Hash password only if modified
+        if (this.isModified('password')) {
+            const salt = await bcrypt.genSalt(10);
+            this.password = await bcrypt.hash(this.password, salt);
+        }
+
+        // Update timestamp
         this.updatedAt = Date.now();
+
         next();
     } catch (error) {
         next(error);

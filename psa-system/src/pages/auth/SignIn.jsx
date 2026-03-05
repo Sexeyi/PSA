@@ -9,7 +9,7 @@ const SignIn = () => {
     employeeId: '',
     email: '',
     department: '',
-    role: 'Requester',
+    role: 'Employee',
     password: '',
     confirmPassword: ''
   });
@@ -65,22 +65,22 @@ const SignIn = () => {
     return true;
   };
 
-  // const retryFetch = async (url, options, maxRetries = 3, delay = 1000) => {
-  //   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-  //     try {
-  //       const response = await fetch(url, options);
-  //       if (response.ok || response.status < 500) {
-  //         return response;
-  //       }
-  //       throw new Error(`HTTP ${response.status}`);
-  //     } catch (error) {
-  //       if (attempt === maxRetries) {
-  //         throw error;
-  //       }
-  //       await new Promise(resolve => setTimeout(resolve, delay * attempt));
-  //     }
-  //   }
-  // };
+  const retryFetch = async (url, options, maxRetries = 3, delay = 1000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options);
+        if (response.ok || response.status < 500) {
+          return response;
+        }
+        throw new Error(`HTTP ${response.status}`);
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay * attempt));
+      }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
