@@ -1,0 +1,269 @@
+.profile-container {
+  padding: 20px;
+  width: 100%;
+  max-width: calc(100vw - 230px);
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
+  background-color: #ffffff;
+}
+
+.profile-container h1 {
+  color: #48cae4;
+  font-size: 24px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: bold;
+  border-bottom: 2px solid #48cae4;
+  padding-bottom: 10px;
+}
+
+.profile-card {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  border: 2px solid #48cae4;
+}
+
+.profile-header {
+  background-color: #ffffff;
+  padding: 30px;
+  text-align: center;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  background-color: #48cae4;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 15px;
+  font-size: 32px;
+  font-weight: bold;
+  color: #48cae4;
+  border: 3px solid #ffffff;
+}
+
+.profile-header h2 {
+  color: #333333;
+  font-size: 20px;
+  margin: 10px 0 5px;
+}
+
+.profile-role {
+  display: inline-block;
+  background-color: #48cae4;
+  color: #ffffff;
+  padding: 5px 15px;
+  font-size: 12px;
+}
+
+.profile-details {
+  padding: 20px;
+}
+
+.profile-detail {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid #48cae4;
+}
+
+.profile-detail:last-child {
+  margin-bottom: 0;
+}
+
+.profile-detail label {
+  font-weight: bold;
+  color: #333333;
+  min-width: 120px;
+  font-size: 14px;
+}
+
+.profile-detail span {
+  color: #333333;
+  font-size: 14px;
+  flex: 1;
+}
+
+.profile-actions {
+  padding: 15px 20px 20px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.edit-profile-btn,
+.change-password-btn {
+  padding: 10px 20px;
+  border: 2px solid #48cae4;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.edit-profile-btn {
+  background-color: #48cae4;
+  color: #ffffff;
+}
+
+.edit-profile-btn:hover {
+  background-color: #333333;
+}
+
+.change-password-btn {
+  background-color: #ffffff;
+  color: #333333;
+}
+
+.change-password-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #ffffff;
+  border: 2px solid #48cae4;
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 2px solid #48cae4;
+  background-color: #48cae4;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: #cccccc;
+}
+
+.modal-content form {
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #333333;
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #48cae4;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: 2px solid #48cae4;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+.cancel-btn,
+.save-btn {
+  padding: 10px 20px;
+  border: none;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.cancel-btn {
+  background-color: #ffffff;
+  color: #48cae4;
+}
+
+.cancel-btn:hover {
+  background-color: #bbbbbb;
+}
+
+.save-btn {
+  background-color: #333333;
+  color: #ffffff;
+}
+
+.save-btn:hover {
+  background-color: #333333;
+}
+
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 10px;
+    max-width: 100%;
+  }
+
+  .profile-detail {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .profile-detail label {
+    min-width: auto;
+  }
+
+  .profile-actions {
+    flex-direction: column;
+  }
+
+  .edit-profile-btn,
+  .change-password-btn {
+    width: 100%;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .cancel-btn,
+  .save-btn {
+    width: 100%;
+  }
+}
