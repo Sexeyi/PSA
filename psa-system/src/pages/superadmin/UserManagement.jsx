@@ -315,13 +315,16 @@ const UserManagement = () => {
 
                                 <div className="form-group">
                                     <label>Department *</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         name="department"
                                         value={formData.department}
                                         onChange={handleInputChange}
-                                        placeholder="Enter department"
-                                    />
+                                    >
+                                        <option value="Finance and Admin Unit">Finance and Admin Unit</option>
+                                        <option value="Statistical Unit">Statistical Unit</option>
+                                        <option value="Registry Unit">Registry Unit</option>
+                                        <option value="National ID Unit">National ID Unit</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -346,7 +349,7 @@ const UserManagement = () => {
                                         value="Auto-generated"
                                         disabled
                                     />
-                                    <small>Password will be auto-generated and sent via email</small>
+                                    <small>Password will be auto-generated.</small>
                                 </div>
                             )}
                         </div>

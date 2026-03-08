@@ -22,7 +22,7 @@ const auth = async (req, res, next) => {
             return res.status(401).json({ message: 'User not found' });
         }
 
-        req.user = user; // full user object
+        req.user = user;
         next();
     } catch (error) {
         console.error('Auth error:', error);
