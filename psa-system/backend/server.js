@@ -7,8 +7,15 @@ const bcrypt = require('bcrypt')
 
 const { connectDB, PORT } = require('./config/db');
 const authRoutes = require('./routes/auth');
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const requisitionRoutes = require("./routes/requisitionRoutes");
+
 
 const app = express();
+
+//Request Inventory
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/requisitions", requisitionRoutes);
 
 // Middleware
 app.use(cors());
