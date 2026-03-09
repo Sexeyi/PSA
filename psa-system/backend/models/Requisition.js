@@ -6,8 +6,6 @@ const itemSchema = new mongoose.Schema({
         ref: "Inventory"
     },
     itemName: String,
-    description: String,
-    category: String,
     quantity: Number
 });
 
@@ -31,8 +29,8 @@ const requisitionSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ["Pending Approver", "Pending Admin", "Approved", "Rejected"],
-        default: "Pending Approver"
+        enum: ["Pending", "Approved", "Rejected"],
+        default: "Pending"
     }
 
 }, { timestamps: true });

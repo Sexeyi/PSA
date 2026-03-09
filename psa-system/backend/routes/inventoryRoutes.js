@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const inventoryController = require("../controllers/inventoryController");
+const inventoryController = require("../controller/inventoryController");
 const auth = require("../middleware/auth");
 
 router.get("/", auth, inventoryController.getInventory);

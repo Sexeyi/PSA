@@ -1,32 +1,28 @@
 const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema({
+
     type: {
         type: String,
-        enum: ["addition", "issuance", "adjustment"],
-        required: true
+        enum: ["addition", "issuance", "adjustment"]
     },
+
     quantity: Number,
-    unitPrice: Number,
-    total: Number,
+
     reference: String,
+
     date: {
         type: Date,
         default: Date.now
     }
+
 });
 
 const inventorySchema = new mongoose.Schema({
 
-    itemName: {
-        type: String,
-        required: true
-    },
+    name: String,
 
-    category: {
-        type: String,
-        enum: ["Office Supplies", "Consumables", "COVID-19 Response Item"]
-    },
+    category: String,
 
     unit: String,
 
@@ -35,18 +31,10 @@ const inventorySchema = new mongoose.Schema({
         default: 0
     },
 
-    unitPrice: {
-        type: Number,
-        default: 0
-    },
-
-    lowStockThreshold: {
-        type: Number,
-        default: 10
-    },
+    unitPrice: Number,
 
     transactions: [transactionSchema]
 
-}, { timestamps: true });
+});
 
 module.exports = mongoose.model("Inventory", inventorySchema);
