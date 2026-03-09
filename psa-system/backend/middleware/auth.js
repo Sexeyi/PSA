@@ -22,12 +22,18 @@ const auth = async (req, res, next) => {
             return res.status(401).json({ message: 'User not found' });
         }
 
-        req.user = user; // full user object
+        req.user = {
+            _id: user._id,
+            fullName: user.fullName,
+            department: user.department
+        };
         next();
     } catch (error) {
         console.error('Auth error:', error);
         res.status(401).json({ message: 'Token is not valid' });
     }
 };
+
+
 
 module.exports = auth;

@@ -3,34 +3,35 @@ const cors = require('cors');
 require('dotenv').config();
 const User = require('./models/User');
 const bcrypt = require('bcrypt')
-
+const mongoose = require('mongoose');
 
 const { connectDB, PORT } = require('./config/db');
 const authRoutes = require('./routes/auth');
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const requisitionRoutes = require("./routes/requisitionRoutes");
 
-
 const app = express();
 
-//Request Inventory
-app.use("/api/inventory", inventoryRoutes);
-app.use("/api/requisitions", requisitionRoutes);
-
-// Middleware
-app.use(cors());
+// 1️⃣ Apply CORS and JSON parsing BEFORE routes
+app.use(cors({
+    origin: 'http://localhost:5173', // your frontend URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true // if you use cookies/auth
+}));
 app.use(express.json());
 
-// Request logging middleware
+// 2️⃣ Request logging middleware
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     next();
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
+// 3️⃣ Routes
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/requisitions", requisitionRoutes);
+app.use("/api/auth", authRoutes);
 
-// Health check route
+// Health check
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'Server is running',
@@ -39,7 +40,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
     res.status(500).json({
@@ -48,12 +49,11 @@ app.use((err, req, res, next) => {
     });
 });
 
+// Seed SuperAdmin
 const seedSuperAdmin = async () => {
-    const adminExist = await User.findOne({ role: "SuperAdmin" })
-
+    const adminExist = await User.findOne({ role: "SuperAdmin" });
     if (!adminExist) {
         const hashedPassword = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, 10);
-
         await User.create({
             fullName: "System SuperAdmin",
             employeeId: "SUPER001",
@@ -62,23 +62,17 @@ const seedSuperAdmin = async () => {
             password: process.env.SUPER_ADMIN_PASSWORD,
             role: "SuperAdmin"
         });
-        console.log("Super Admin Created!")
+        console.log("Super Admin Created!");
     }
-}
+};
 
-
-// Import mongoose for connection checking
-const mongoose = require('mongoose');
-
-// Start server after connecting to     
+// Start server
 const startServer = async () => {
     try {
         await connectDB();
-
-        await seedSuperAdmin()
-
+        await seedSuperAdmin();
         app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
+            console.log(`Server running on port ${PORT}`);
             console.log(`MongoDB connection state: ${mongoose.connection.readyState}`);
         });
     } catch (error) {
@@ -86,7 +80,5 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
-
 
 startServer();
