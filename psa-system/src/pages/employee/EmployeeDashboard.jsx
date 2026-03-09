@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import "./Dashboard.css";
+import "./EmployeeDashboard.css";
 
 const demoRequisitions = [
     { id: "RQ-1007", title: "Ballpen, black", status: "Pending", priority: "High", createdAt: "2026-03-02", neededBy: "2026-03-08" },

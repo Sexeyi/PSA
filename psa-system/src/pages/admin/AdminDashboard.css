@@ -1,0 +1,14 @@
+/* Low stock → red */
+.low-stock {
+  background-color: #f8d7da;
+}
+
+/* Pending rows → yellow */
+.pending-row {
+  background-color: #fff3cd;
+}
+
+/* Hover effect for better UX */
+.pending-table tbody tr:hover {
+  background-color: #e2e3e5;
+}

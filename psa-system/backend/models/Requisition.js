@@ -17,7 +17,9 @@ const RequisitionSchema = new mongoose.Schema({
     status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
     dateRequested: { type: Date, default: Date.now },
     approvedDate: { type: Date },
-    remarks: { type: String, default: "" }
+    remarks: { type: String, default: "" },
+    approvedBy: { type: String, default: "" },
+    approverRemarks: { type: String, default: "" },
 });
 
 module.exports = mongoose.model('Requisition', RequisitionSchema);

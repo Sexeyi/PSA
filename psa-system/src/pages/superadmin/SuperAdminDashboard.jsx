@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Dashboard.css';  // Add this import
+import './SuperAdminDashboard.css';
 
 const Dashboard = ({ totalSupplies }) => {
   const navigate = useNavigate();

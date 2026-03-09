@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import './ApproveRequests.css';
 
 const ApproveRequests = () => {
+
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rejectRequest, setRejectRequest] = useState(null);
-
   const [remarks, setRemarks] = useState('');
   const [filter, setFilter] = useState('pending');
 
@@ -15,228 +14,239 @@ const ApproveRequests = () => {
     fetchRequests();
   }, [filter]);
 
-  // Fetch all requisitions (admin)
   const fetchRequests = async () => {
-    setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const status = filter !== 'all' ? `?status=${filter}` : '';
-
-      const res = await fetch(`http://localhost:5000/api/requisitions${status}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch(`http://localhost:5000/api/requisitions${status}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      const data = await res.json();
+      const data = await response.json();
       setRequests(data.requests || []);
-    } catch (err) {
-      console.error('Fetch error:', err);
+    } catch (error) {
+      console.error("Fetch error", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Approve a requisition
+  const handlePrintPDF = async (requestId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/requisitions/${requestId}/pdf`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const newWindow = window.open(url, '_blank');
+      if (!newWindow) alert('Please allow popups to print PDF');
+
+    } catch (error) {
+      console.error('PDF error:', error);
+      alert('Error fetching PDF');
+    }
+  };
+
   const handleApprove = async (requestId) => {
     try {
       const token = localStorage.getItem('token');
-
-      const res = await fetch(`http://localhost:5000/api/requisitions/${requestId}/approve`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ remarks, approvedDate: new Date().toISOString() }),
+      const response = await fetch(`http://localhost:5000/api/requisitions/${requestId}/approve`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ remarks, approvedDate: new Date().toISOString() })
       });
-
-      if (res.ok) {
+      if (response.ok) {
         setSelectedRequest(null);
         setRemarks('');
         fetchRequests();
-      } else {
-        const errorData = await res.json();
-        alert(errorData.message || 'Error approving requisition');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   };
 
-  // Reject a requisition
   const handleReject = async (requestId) => {
-    if (!remarks.trim()) return alert('Please provide rejection remarks');
-
+    if (!remarks.trim()) {
+      alert("Please provide rejection remarks");
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
-
-      const res = await fetch(`http://localhost:5000/api/requisitions/${requestId}/reject`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ remarks }),
+      const response = await fetch(`http://localhost:5000/api/requisitions/${requestId}/reject`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ remarks })
       });
-
-      if (res.ok) {
+      if (response.ok) {
         setRejectRequest(null);
         setRemarks('');
         fetchRequests();
-      } else {
-        const errorData = await res.json();
-        alert(errorData.message || 'Error rejecting requisition');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   };
 
-  const formatDate = (date) =>
-    date ? new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+  const formatDate = (date) => !date ? "N/A" : new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
   if (loading) return <div className="loading-spinner">Loading requests...</div>;
 
   return (
     <div className="approve-container">
-      <div className="approve-header">
-        <h1>Requests for Approval</h1>
-      </div>
 
-      {/* Filter Tabs */}
+      <div className="approve-header"><h1>Requests for Approval</h1></div>
+
+      {/* FILTER TABS */}
       <div className="filter-tabs">
-        {['pending', 'approved', 'rejected', 'all'].map((status) => (
-          <button
-            key={status}
-            className={filter === status ? 'active' : ''}
-            onClick={() => setFilter(status)}
-          >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+        {['pending', 'approved', 'rejected', 'all'].map(f => (
+          <button key={f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>
+            {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>
 
-      {/* Requests List */}
+      {/* REQUEST LIST */}
       <div className="requests-list">
         {requests.length === 0 && <p className="empty-state">No requests found</p>}
 
-        {requests.map((req) => (
-          <div key={req._id} className="request-card">
+        {requests.map(request => (
+          <div key={request._id} className="request-card">
             <div className="request-header">
               <div>
-                <h3>{req.requesterName}</h3>
-                <span className="department">{req.department}</span>
+                <h3>{request.requesterName}</h3>
+                <span className="department">{request.department}</span>
               </div>
-              <span className={`status ${req.status.toLowerCase()}`}>{req.status}</span>
+              <span className={`status ${request.status.toLowerCase()}`}>{request.status}</span>
             </div>
 
             <div className="request-details">
-              {req.items.map((item, idx) => (
-                <div key={idx} className="request-item">
-                  <strong> {item.quantity} {item.itemName}</strong>
-                  <p>
-                    ₱  {item.unit}
-                  </p>
-                  <p className="category">{item.category}</p>
-                </div>
-              ))}
-              {req.notes && <p className="purpose">Notes: {req.notes}</p>}
-              <p className="date">Requested: {formatDate(req.dateRequested)}</p>
-            </div>
+              {/* Display items as table inside card */}
+              <table className="items-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {request.items.map((item, i) => (
+                    <tr key={i}>
+                      <td>{item.itemName}</td>
+                      <td>{item.quantity}</td>
+                      <td>{item.unit || "-"}</td>
+                      <td>{item.category || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-            {/* Actions */}
-            <div className="request-actions">
-              <button className="view-btn" onClick={() => setSelectedRequest(req)}>
-                View Details
-              </button>
-              {req.status === 'Pending' && (
+              {request.notes && <p><strong>Notes:</strong> {request.notes}</p>}
+              {(request.status === "Approved" || request.status === "Rejected") && (
                 <>
-                  <button className="approve-btn" onClick={() => handleApprove(req._id)}>
-                    Approve
-                  </button>
-                  <button className="reject-btn" onClick={() => setRejectRequest(req)}>
-                    Reject
-                  </button>
+                  <p><strong>Approved By:</strong> {request.approvedBy || "N/A"}</p>
+                  <p><strong>Remarks:</strong> {request.approverRemarks || "N/A"}</p>
+                  <p><strong>Processed Date:</strong> {formatDate(request.approvedDate)}</p>
                 </>
               )}
             </div>
+
+            {/* ACTION BUTTONS */}
+            <div className="request-actions">
+              <button className="view-btn" onClick={() => setSelectedRequest(request)}>View Details</button>
+              {request.status === "Pending" && (
+                <>
+                  <button className="approve-btn" onClick={() => handleApprove(request._id)}>Approve</button>
+                  <button className="reject-btn" onClick={() => setRejectRequest(request)}>Reject</button>
+                </>
+              )}
+            </div>
+
           </div>
         ))}
       </div>
 
-      {/* Selected Request Modal */}
+      {/* DETAILS MODAL */}
       {selectedRequest && (
         <div className="modal-backdrop" onClick={() => setSelectedRequest(null)}>
           <div className="modal large" onClick={(e) => e.stopPropagation()}>
             <h2>Requisition Details</h2>
-            <p><strong>Requester:</strong> {selectedRequest.requesterName}</p>
-            <p><strong>Department:</strong> {selectedRequest.department}</p>
-            {selectedRequest.items.map((item, idx) => (
-              <div key={idx}>
-                <p><strong>Item {idx + 1}:</strong> {item.itemName}</p>
-                <p>Category: {item.category}</p>
-                <p>Quantity: {item.quantity}pcs, Pesos{item.unit}</p>
-              </div>
-            ))}
+
+            <table className="items-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th>Unit</th>
+                  <th>Category</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedRequest.items.map((item, i) => (
+                  <tr key={i}>
+                    <td>{item.itemName}</td>
+                    <td>{item.quantity}</td>
+                    <td>{item.unit || "-"}</td>
+                    <td>{item.category || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
             {selectedRequest.notes && <p><strong>Notes:</strong> {selectedRequest.notes}</p>}
-            <p><strong>Date Requested:</strong> {formatDate(selectedRequest.dateRequested)}</p>
+            {(selectedRequest.status === "Approved" || selectedRequest.status === "Rejected") && (
+              <>
+                <p><strong>Approved By:</strong> {selectedRequest.approvedBy || "N/A"}</p>
+                <p><strong>Remarks:</strong> {selectedRequest.approverRemarks || "N/A"}</p>
+                <p><strong>Processed Date:</strong> {formatDate(selectedRequest.approvedDate)}</p>
+              </>
+            )}
 
             <div className="modal-actions">
               <button
                 className="print-btn"
-                onClick={() =>
-                  window.open(`http://localhost:5000/api/requisitions/${selectedRequest._id}/pdf`)
-                }
+                onClick={() => handlePrintPDF(selectedRequest._id)}
               >
-                Print PDF
+                Export
               </button>
 
-              {selectedRequest.status === 'Pending' && (
+              {selectedRequest.status === "Pending" && (
                 <>
-                  <button className="approve-btn" onClick={() => handleApprove(selectedRequest._id)}>
-                    Approve
-                  </button>
-                  <button
-                    className="reject-btn"
-                    onClick={() => {
-                      setRejectRequest(selectedRequest);
-                      setSelectedRequest(null);
-                    }}
-                  >
-                    Reject
-                  </button>
+                  <button className="approve-btn" onClick={() => handleApprove(selectedRequest._id)}>Approve</button>
+                  <button className="reject-btn" onClick={() => { setRejectRequest(selectedRequest); setSelectedRequest(null); }}>Reject</button>
                 </>
               )}
-              <button className="cancel-btn" onClick={() => setSelectedRequest(null)}>
-                Close
-              </button>
+
+              <button className="cancel-btn" onClick={() => setSelectedRequest(null)}>Close</button>
             </div>
+
           </div>
         </div>
       )}
 
-      {/* Reject Modal */}
+      {/* REJECT MODAL */}
       {rejectRequest && (
         <div className="modal-backdrop" onClick={() => setRejectRequest(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Reject Request</h2>
             <p><strong>{rejectRequest.requesterName}</strong></p>
-            <textarea
-              placeholder="Enter rejection reason..."
-              rows="4"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-            />
+            <textarea placeholder="Enter rejection reason..." rows="4" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => setRejectRequest(null)}>
-                Cancel
-              </button>
-              <button className="reject-btn" onClick={() => handleReject(rejectRequest._id)}>
-                Confirm Reject
-              </button>
+              <button className="cancel-btn" onClick={() => setRejectRequest(null)}>Cancel</button>
+              <button className="reject-btn" onClick={() => handleReject(rejectRequest._id)}>Confirm Reject</button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };
