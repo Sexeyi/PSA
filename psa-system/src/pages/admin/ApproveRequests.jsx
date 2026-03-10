@@ -133,7 +133,7 @@ const ApproveRequests = () => {
                   <tr>
                     <th>Item</th>
                     <th>Qty</th>
-                    <th>Unit</th>
+                    <th>Unit Price</th>
                     <th>Category</th>
                   </tr>
                 </thead>

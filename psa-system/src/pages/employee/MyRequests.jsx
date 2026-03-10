@@ -4,7 +4,7 @@ import "./MyRequests.css";
 
 const MyRequests = () => {
     const [notes, setNotes] = useState("");
-    const [items, setItems] = useState([{ itemName: "", quantity: 1, unit: "", category: "" }]);
+    const [items, setItems] = useState([{ itemName: "", quantity: 0, unit: "", category: "" }]);
 
     const handleItemChange = (index, field, value) => {
         const updated = [...items];
@@ -13,7 +13,7 @@ const MyRequests = () => {
     };
 
     const addItem = () => {
-        setItems([...items, { itemName: "", quantity: 1, unit: "", category: "" }]);
+        setItems([...items, { itemName: "", quantity: 0, unit: "", category: "" }]);
     };
 
     const removeItem = (index) => {

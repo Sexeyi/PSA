@@ -20,7 +20,7 @@ const daysAgoLabel = (date) => {
     return `${diff}d ago`;
 };
 
-export default function Dashboard() {
+export default function EmployeeDashboard() {
     const [filter, setFilter] = useState("All");
     const [showProfile, setShowProfile] = useState(false);
     const [calDate, setCalDate] = useState(new Date());
