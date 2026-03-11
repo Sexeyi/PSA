@@ -38,7 +38,7 @@ const Login = (props) => {
       console.log('3. Response data:', data);
 
       if (response.ok) {
-        // ✅ Save to localStorage
+        // Save to localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
@@ -48,7 +48,7 @@ const Login = (props) => {
           console.log('Remember me checked - session will be longer');
         }
 
-        console.log('4. ✅ Login successful, data saved to localStorage');
+        console.log('4. Login successful, data saved to localStorage');
         console.log('   - Token saved:', !!data.token);
         console.log('   - User saved:', data.user);
 
@@ -57,7 +57,7 @@ const Login = (props) => {
           props.onLogin(data.user, data.token);
         }
 
-        // ✅ Small delay to ensure storage is updated
+        //  Small delay to ensure storage is updated
         setTimeout(() => {
           console.log('5. Redirecting to dashboard...');
           navigate('/dashboard', { replace: true });
