@@ -11,6 +11,7 @@ const AdminDashboard = () => {
 
     const [requisitions, setRequisitions] = useState([]);
     const [inventory, setInventory] = useState([]);
+    const [inventoryError, setInventoryError] = useState(null);
 
     useEffect(() => {
         const userData = localStorage.getItem('user');
@@ -39,43 +40,98 @@ const AdminDashboard = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
+                setError(null);
+                setInventoryError(null);
 
                 const headers = {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 };
 
+                // Get the API base URL
+                const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
                 // Fetch requisitions
-                const reqResponse = await fetch('/api/requisitions', { headers });
-                const invResponse = await fetch('/api/inventory', { headers });
+                try {
+                    const reqResponse = await fetch(`${API_BASE_URL}/api/requisitions`, { headers });
 
-                if (!reqResponse.ok || !invResponse.ok) {
-                    throw new Error('Failed to fetch data');
+                    if (!reqResponse.ok) {
+                        console.error('Requisitions fetch failed:', reqResponse.status);
+                    } else {
+                        const requisitionsData = await reqResponse.json();
+
+                        // Extract requisitions array
+                        let requisitionsArray = [];
+                        if (requisitionsData.requests && Array.isArray(requisitionsData.requests)) {
+                            requisitionsArray = requisitionsData.requests;
+                        } else if (Array.isArray(requisitionsData)) {
+                            requisitionsArray = requisitionsData;
+                        }
+
+                        setRequisitions(requisitionsArray);
+                    }
+                } catch (reqError) {
+                    console.error('Error fetching requisitions:', reqError);
                 }
 
-                const requisitionsData = await reqResponse.json();
-                const inventoryData = await invResponse.json();
+                // Fetch inventory from /api/inventories
+                try {
+                    console.log('Fetching inventory from:', `${API_BASE_URL}/api/inventories`);
 
-                // Extract requisitions array - your backend sends { requests: [...] }
-                let requisitionsArray = [];
-                if (requisitionsData.requests && Array.isArray(requisitionsData.requests)) {
-                    requisitionsArray = requisitionsData.requests;
+                    const invResponse = await fetch(`${API_BASE_URL}/api/inventories`, { headers });
+
+                    if (!invResponse.ok) {
+                        console.error('Inventory fetch failed with status:', invResponse.status);
+                        setInventoryError(`Inventory API returned ${invResponse.status}`);
+
+                        // Try to get more error details
+                        const errorText = await invResponse.text();
+                        console.error('Error details:', errorText);
+
+                        setInventory([]);
+                    } else {
+                        const inventoryData = await invResponse.json();
+                        console.log('Inventory data received:', inventoryData);
+
+                        // YOUR BACKEND RETURNS A DIRECT ARRAY OF ITEMS
+                        // No need for complex extraction - it's already an array!
+                        let inventoryArray = [];
+
+                        if (Array.isArray(inventoryData)) {
+                            // This is what your backend returns - a direct array
+                            inventoryArray = inventoryData;
+                            console.log('✅ Inventory is a direct array with', inventoryArray.length, 'items');
+                        } else if (inventoryData.data && Array.isArray(inventoryData.data)) {
+                            inventoryArray = inventoryData.data;
+                        } else if (inventoryData.inventories && Array.isArray(inventoryData.inventories)) {
+                            inventoryArray = inventoryData.inventories;
+                        } else {
+                            console.warn('Unexpected inventory data format:', inventoryData);
+                            // Try to convert object to array if needed
+                            if (typeof inventoryData === 'object' && inventoryData !== null) {
+                                inventoryArray = Object.values(inventoryData).filter(item =>
+                                    item && typeof item === 'object' && (item.name || item._id)
+                                );
+                            }
+                        }
+
+                        setInventory(inventoryArray);
+                        console.log('✅ Processed inventory array:', inventoryArray);
+
+                        // Log sample item structure to help with field names
+                        if (inventoryArray.length > 0) {
+                            console.log('Sample inventory item structure:', inventoryArray[0]);
+                        }
+                    }
+                } catch (invError) {
+                    console.error('Error fetching inventory:', invError);
+                    setInventoryError(invError.message);
+                    setInventory([]);
                 }
-
-                // Extract inventory array
-                let inventoryArray = [];
-                if (Array.isArray(inventoryData)) {
-                    inventoryArray = inventoryData;
-                } else if (inventoryData.data && Array.isArray(inventoryData.data)) {
-                    inventoryArray = inventoryData.data;
-                }
-
-                setRequisitions(requisitionsArray);
-                setInventory(inventoryArray);
 
             } catch (error) {
-                console.error('Error fetching data:', error);
-                setError(error.message);
+                console.error('Error in fetchData:', error);
+                setError('Failed to load some dashboard data');
             } finally {
                 setLoading(false);
             }
@@ -118,8 +174,12 @@ const AdminDashboard = () => {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const hasEvents = requisitions.some(r => {
                 if (!r.dateRequested) return false;
-                const reqDate = new Date(r.dateRequested).toISOString().split('T')[0];
-                return reqDate === dateStr;
+                try {
+                    const reqDate = new Date(r.dateRequested).toISOString().split('T')[0];
+                    return reqDate === dateStr;
+                } catch {
+                    return false;
+                }
             });
 
             days.push(
@@ -147,7 +207,8 @@ const AdminDashboard = () => {
         );
     }
 
-    if (error) {
+    // Only show full error if both requisitions and inventory failed
+    if (error && requisitions.length === 0 && inventory.length === 0) {
         return (
             <div className="error-container">
                 <h3>Error Loading Dashboard</h3>
@@ -161,19 +222,20 @@ const AdminDashboard = () => {
 
     if (!user) return null;
 
-    // Calculate stats
+    // Calculate stats with safe fallbacks
     const totalSupplies = inventory?.length || 0;
 
-    // Low stock items
+    // Low stock items - using 'stock' field from your schema
     const lowStockItems = (inventory || []).filter(item => {
-        const quantity = item.quantity || item.stock || 0;
-        return quantity <= 5;
+        // Your schema uses 'stock' field, not 'quantity'
+        const stockLevel = item.stock ?? 0;
+        return stockLevel <= 5 && stockLevel > 0;
     });
 
     // Pending requisitions
     const pendingRequisitions = (requisitions || []).filter(req => {
         const status = req.status?.toLowerCase();
-        return status === 'pending';
+        return status === 'pending' || status === 'pending approval';
     });
 
     const getGreeting = () => {
@@ -205,14 +267,41 @@ const AdminDashboard = () => {
         ).join(', ');
     };
 
-    // Get total quantity from items
+    // Get total quantity from requisition items
     const getTotalQuantity = (req) => {
         if (!req.items || req.items.length === 0) return 0;
         return req.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
     };
 
+    // Get item name safely from inventory
+    const getItemName = (item) => {
+        return item.name || item.itemName || item.description || 'Unknown';
+    };
+
+    // Get item category safely
+    const getItemCategory = (item) => {
+        return item.category || 'Uncategorized';
+    };
+
+    // Get item unit safely
+    const getItemUnit = (item) => {
+        return item.unit || 'pc';
+    };
+
+    // Get item stock safely (using 'stock' field from your schema)
+    const getItemStock = (item) => {
+        return item.stock ?? 0;
+    };
+
     return (
         <div className="dashboard">
+            {/* Show warning if only inventory failed */}
+            {inventoryError && (
+                <div className="warning-banner">
+                    <p>⚠️ Inventory data unavailable: {inventoryError}. Showing limited dashboard.</p>
+                </div>
+            )}
+
             <div className="dashboard-header">
                 <h1>{getGreeting()}, {user?.fullName || user?.name || 'Admin'}!</h1>
                 <p>Here's your system overview today.</p>
@@ -248,23 +337,29 @@ const AdminDashboard = () => {
                 {/* Low Stock Table */}
                 <div className="dashboard-section">
                     <h2>Low Stock Details</h2>
-                    {lowStockItems.length === 0 ? (
+                    {inventoryError ? (
+                        <p className="no-data error-text">Unable to load inventory data</p>
+                    ) : lowStockItems.length === 0 ? (
                         <p className="no-data">All items have sufficient stock.</p>
                     ) : (
                         <table className="pending-table">
                             <thead>
                                 <tr>
                                     <th>Item Name</th>
-                                    <th>Quantity</th>
-                                    <th>User</th>
+                                    <th>Stock</th>
+                                    <th>Unit</th>
+                                    <th>Category</th>
+                                    <th>Unit Price</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {lowStockItems.map(item => (
                                     <tr key={item._id} className="low-stock">
-                                        <td>{item.itemName || item.name || 'Unknown'}</td>
-                                        <td>{item.quantity || item.stock || 0}</td>
-                                        <td>{item.user || 'N/A'}</td>
+                                        <td>{getItemName(item)}</td>
+                                        <td className="critical-stock">{getItemStock(item)}</td>
+                                        <td>{getItemUnit(item)}</td>
+                                        <td>{getItemCategory(item)}</td>
+                                        <td>₱{item.unitPrice?.toLocaleString() || 'N/A'}</td>
                                     </tr>
                                 ))}
                             </tbody>

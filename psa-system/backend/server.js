@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 });
 
 // 3️⃣ Routes
-app.use("/api/inventory", inventoryRoutes);
+app.use("/api/inventories", inventoryRoutes);
 app.use("/api/requisitions", requisitionRoutes);
 app.use("/api/auth", authRoutes);
 

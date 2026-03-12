@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './Components/Sidebar'
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard'
@@ -43,7 +43,6 @@ function MainContent({
 
     switch (currentView) {
       case 'Dashboard':
-        // Return different dashboard based on role
         if (userRole === 'SuperAdmin') {
           return <SuperAdminDashboard
             totalSupplies={supplies?.length || 0}
@@ -57,6 +56,7 @@ function MainContent({
         }
 
       case 'Supplies':
+        console.log('📦 Rendering ListOfSupplies with supplies:', supplies);
         return <ListOfSupplies
           supplies={supplies || []}
           setSupplies={setSupplies}
@@ -89,6 +89,7 @@ function MainContent({
         }
     }
   };
+
   return (
     <div className="app-container" style={{ display: 'flex' }}>
       <Sidebar
@@ -100,14 +101,22 @@ function MainContent({
         onLogout={handleLogout}
         userRole={user?.role}
       />
-      <div className="main-content" style={{ flex: 1, marginLeft: sidebarExpanded ? '250px' : '70px', transition: 'margin-left 0.3s' }}>
+      <div className="main-content" style={{
+        flex: 1,
+        marginLeft: sidebarExpanded ? '250px' : '70px',
+        transition: 'margin-left 0.3s',
+        minHeight: '100vh',
+        backgroundColor: '#f8f9fa'
+      }}>
         <Navbar
           user={user}
           onLogout={handleLogout}
           onViewChange={setCurrentView}
           menuItems={menuItems}
         />
-        {renderContent()}
+        <div style={{ padding: '20px' }}>
+          {renderContent()}
+        </div>
       </div>
     </div>
   );
@@ -165,27 +174,36 @@ function App() {
     });
   }, [isLoggedIn, user, menuItems, currentView, supplies]);
 
-  // Update menu items when user changes
+  // Update menu items when user changes - FIXED to avoid warning
   useEffect(() => {
     if (user?.role) {
       console.log('🎯 Updating menu for role:', user.role);
       console.log('📋 Available menus:', sidebarMenus);
 
-      const items = sidebarMenus[user.role] || sidebarMenus.employee;
+      const items = sidebarMenus[user.role] || sidebarMenus.Employee;
       console.log('✅ Selected menu items:', items);
 
-      setMenuItems(items);
+      // Use a timeout to break the synchronous state update
+      const timeoutId = setTimeout(() => {
+        setMenuItems(items);
+      }, 0);
 
       // Set default view based on role
       if (!items.includes(currentView)) {
-        console.log('🔄 Setting default view to:', items[0]);
-        setCurrentView(items[0]);
+        setTimeout(() => {
+          console.log('🔄 Setting default view to:', items[0]);
+          setCurrentView(items[0]);
+        }, 0);
       }
+
+      return () => clearTimeout(timeoutId);
     } else {
-      console.log('⚠️ No user role found, clearing menu items');
-      setMenuItems([]);
+      const timeoutId = setTimeout(() => {
+        setMenuItems([]);
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
-  }, [user]);
+  }, [user, currentView]); // Added currentView dependency
 
   // Load user data from localStorage on mount
   useEffect(() => {
@@ -204,17 +222,29 @@ function App() {
       // These should ideally come from API, not localStorage
       const savedSupplies = localStorage.getItem('supplies');
       if (savedSupplies) {
-        setSupplies(JSON.parse(savedSupplies));
+        try {
+          setSupplies(JSON.parse(savedSupplies));
+        } catch (e) {
+          console.error('Error parsing supplies:', e);
+        }
       }
 
       const savedUsers = localStorage.getItem('users');
       if (savedUsers) {
-        setUsers(JSON.parse(savedUsers));
+        try {
+          setUsers(JSON.parse(savedUsers));
+        } catch (e) {
+          console.error('Error parsing users:', e);
+        }
       }
 
       const savedRequisitions = localStorage.getItem('requisitions');
       if (savedRequisitions) {
-        setRequisitions(JSON.parse(savedRequisitions));
+        try {
+          setRequisitions(JSON.parse(savedRequisitions));
+        } catch (e) {
+          console.error('Error parsing requisitions:', e);
+        }
       }
     };
 
@@ -222,6 +252,30 @@ function App() {
       loadUserData();
     }
   }, [isLoggedIn]);
+
+  // Fetch supplies from API when component mounts
+  useEffect(() => {
+    const fetchSupplies = async () => {
+      if (!isLoggedIn || !user) return;
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/api/inventories', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📦 Fetched supplies from API:', data);
+          setSupplies(data);
+        }
+      } catch (error) {
+        console.error('Error fetching supplies:', error);
+      }
+    };
+
+    fetchSupplies();
+  }, [isLoggedIn, user]);
 
   const handleLogin = (userData, token) => {
     console.log('🔐 handleLogin called with userData:', userData);
@@ -250,27 +304,11 @@ function App() {
     setUser(null);
     setMenuItems([]);
     setCurrentView('Dashboard');
+    setSupplies([]);
+    setUsers([]);
+    setRequisitions([]);
     console.log('✅ Logout complete, localStorage cleared');
   }
-
-  // Remove these localStorage saves if data should come from API
-  useEffect(() => {
-    if (supplies.length > 0) {
-      localStorage.setItem('supplies', JSON.stringify(supplies));
-    }
-  }, [supplies]);
-
-  useEffect(() => {
-    if (users.length > 0) {
-      localStorage.setItem('users', JSON.stringify(users));
-    }
-  }, [users]);
-
-  useEffect(() => {
-    if (requisitions.length > 0) {
-      localStorage.setItem('requisitions', JSON.stringify(requisitions));
-    }
-  }, [requisitions]);
 
   return (
     <Router>

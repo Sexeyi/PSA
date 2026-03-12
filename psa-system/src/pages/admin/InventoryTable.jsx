@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
 import "./InventoryTable.css";
 
-const InventoryTable = () => {
-  const [inventory, setInventory] = useState([]);
+const ListOfSupplies = ({ supplies = [], setSupplies, userRole }) => {
+
   const [expandedRows, setExpandedRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+
   const [formData, setFormData] = useState({
-    itemName: "",
+    name: "",
     unit: "",
     category: "",
     stock: 0,
@@ -19,21 +20,59 @@ const InventoryTable = () => {
     balances: { qty: 0, unitPrice: 0, total: 0 }
   });
 
-  // Fetch inventory from API
+  // SAFE getter for nested values
+  const getNestedValue = (item, section, field) => {
+    return item?.[section]?.[field] ?? 0;
+  };
+
+  // Ensure every item has all required nested objects
+  const sanitizeItem = (item) => ({
+    ...item,
+    inventoryDec31: item.inventoryDec31 || { qty: 0, unitPrice: 0, total: 0 },
+    additions: item.additions || { qty: 0, unitPrice: 0, total: 0 },
+    issuances: item.issuances || { qty: 0, unitPrice: 0, total: 0 },
+    balances: item.balances || {
+      qty: item.stock || 0,
+      unitPrice: item.unitPrice || 0,
+      total: (item.stock || 0) * (item.unitPrice || 0)
+    }
+  });
+
   useEffect(() => {
-    fetchInventory();
+    if (!supplies || supplies.length === 0) {
+      fetchInventory();
+    }
   }, []);
 
   const fetchInventory = async () => {
     try {
+      setLoading(true);
+
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/inventory", {
-        headers: { Authorization: `Bearer ${token}` },
+
+      const response = await fetch("http://localhost:5000/api/inventories", {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
-      const data = await res.json();
-      setInventory(data);
-    } catch (err) {
-      console.error(err);
+
+      if (!response.ok) throw new Error("Failed to fetch inventory");
+
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        console.error("Inventory response not array:", data);
+        return;
+      }
+
+      const sanitized = data.map(sanitizeItem);
+
+      if (setSupplies) {
+        setSupplies(sanitized);
+      }
+
+    } catch (error) {
+      console.error("Fetch inventory error:", error);
     } finally {
       setLoading(false);
     }
@@ -41,403 +80,247 @@ const InventoryTable = () => {
 
   const toggleRow = (id) => {
     setExpandedRows((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id)
+        ? prev.filter((i) => i !== id)
+        : [...prev, id]
     );
   };
 
-  // Handle input changes for main form
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+
+    setFormData((prev) => ({
       ...prev,
       [name]: value
     }));
   };
 
-  // Handle changes for nested objects (inventoryDec31, additions, etc.)
   const handleNestedChange = (section, field, value) => {
-    setFormData(prev => {
+
+    setFormData((prev) => {
+
+      const numValue = parseFloat(value) || 0;
+
       const updatedSection = {
-        ...prev[section],
-        [field]: parseFloat(value) || 0
+        ...(prev[section] || { qty: 0, unitPrice: 0, total: 0 }),
+        [field]: numValue
       };
 
-      // Calculate total for the section
-      updatedSection.total = (updatedSection.qty * updatedSection.unitPrice) || 0;
+      updatedSection.total = (updatedSection.qty || 0) * (updatedSection.unitPrice || 0);
 
-      // Update balances based on calculations
-      const newFormData = {
+      const newData = {
         ...prev,
         [section]: updatedSection
       };
 
-      // Recalculate balances
-      const totalQty = (newFormData.inventoryDec31.qty + newFormData.additions.qty) - newFormData.issuances.qty;
-      const totalValue = (newFormData.inventoryDec31.total + newFormData.additions.total) - newFormData.issuances.total;
-      const avgUnitPrice = totalQty > 0 ? totalValue / totalQty : 0;
+      const dec31Qty = newData.inventoryDec31.qty || 0;
+      const additionsQty = newData.additions.qty || 0;
+      const issuancesQty = newData.issuances.qty || 0;
 
-      newFormData.balances = {
-        qty: totalQty,
-        unitPrice: avgUnitPrice,
-        total: totalValue
+      const dec31Total = newData.inventoryDec31.total || 0;
+      const additionsTotal = newData.additions.total || 0;
+      const issuancesTotal = newData.issuances.total || 0;
+
+      const balanceQty = dec31Qty + additionsQty - issuancesQty;
+      const balanceTotal = dec31Total + additionsTotal - issuancesTotal;
+      const balanceUnitPrice = balanceQty > 0 ? balanceTotal / balanceQty : 0;
+
+      newData.balances = {
+        qty: balanceQty,
+        unitPrice: balanceUnitPrice,
+        total: balanceTotal
       };
 
-      // Update main stock and unitPrice
-      newFormData.stock = totalQty;
-      newFormData.unitPrice = avgUnitPrice;
+      newData.stock = balanceQty;
+      newData.unitPrice = balanceUnitPrice;
 
-      return newFormData;
+      return newData;
     });
   };
 
-  // Add new inventory item
   const handleAddItem = async () => {
+
+    if (!formData.name || !formData.unit || !formData.category) {
+      alert("Please fill all required fields");
+      return;
+    }
+
     try {
+
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:5000/api/inventory", {
+
+      const payload = {
+        ...formData,
+        stock: formData.balances.qty,
+        unitPrice: formData.balances.unitPrice
+      };
+
+      const response = await fetch("http://localhost:5000/api/inventories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to add item");
+      if (response.ok) {
+
+        setShowAddModal(false);
+
+        setFormData({
+          name: "",
+          unit: "",
+          category: "",
+          stock: 0,
+          unitPrice: 0,
+          inventoryDec31: { qty: 0, unitPrice: 0, total: 0 },
+          additions: { qty: 0, unitPrice: 0, total: 0 },
+          issuances: { qty: 0, unitPrice: 0, total: 0 },
+          balances: { qty: 0, unitPrice: 0, total: 0 }
+        });
+
+        fetchInventory();
       }
 
-      // Refresh inventory list
-      await fetchInventory();
-      setShowAddModal(false);
-
-      // Reset form
-      setFormData({
-        itemName: "",
-        unit: "",
-        category: "",
-        stock: 0,
-        unitPrice: 0,
-        inventoryDec31: { qty: 0, unitPrice: 0, total: 0 },
-        additions: { qty: 0, unitPrice: 0, total: 0 },
-        issuances: { qty: 0, unitPrice: 0, total: 0 },
-        balances: { qty: 0, unitPrice: 0, total: 0 }
-      });
-    } catch (err) {
-      console.error("Error adding item:", err);
-      alert("Failed to add item. Please try again.");
+    } catch (error) {
+      console.error("Add item error:", error);
     }
   };
 
-  // Filter inventory based on search term
-  const filteredInventory = inventory.filter(
-    (item) =>
-      item.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  const safeSupplies = (supplies || []).map(sanitizeItem);
+
+  const filteredInventory = safeSupplies.filter((item) =>
+    (item.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.category || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <div className="loading-container">Loading Inventory...</div>;
+  const formatCurrency = (amount) => {
+    return `₱${Number(amount || 0).toFixed(2)}`;
+  };
+
+  if (loading) return <div className="loading-spinner">Loading inventory...</div>;
 
   return (
     <div className="inventory-container">
+
       <div className="inventory-header">
         <h1>Inventory of Office Supplies</h1>
-        <button
-          className="btn-add-item"
-          onClick={() => setShowAddModal(true)}
-        >
-          + Add New Item
-        </button>
+
+        {(userRole === "SuperAdmin" || userRole === "Admin") && (
+          <button
+            className="btn-add-item"
+            onClick={() => setShowAddModal(true)}
+          >
+            + Add New Item
+          </button>
+        )}
       </div>
 
       <div className="inventory-controls">
         <input
           type="text"
-          placeholder="Search by item or category..."
+          placeholder="Search item or category..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          className="search-input"
         />
       </div>
 
-      <table className="inventory-table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Unit</th>
-            <th>Category</th>
-            <th>Stock</th>
-            <th>Total Value</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredInventory.map((item) => (
-            <React.Fragment key={item._id}>
-              <tr>
-                <td>{item.itemName}</td>
-                <td>{item.unit}</td>
-                <td>{item.category}</td>
-                <td>{item.stock}</td>
-                <td>₱{(item.balances?.total || 0).toFixed(2)}</td>
-                <td>
-                  <button
-                    className="btn-details"
-                    onClick={() => toggleRow(item._id)}
-                  >
-                    {expandedRows.includes(item._id) ? "−" : "+"} Details
-                  </button>
-                </td>
-              </tr>
+      <div className="inventory-list">
 
-              {expandedRows.includes(item._id) && (
-                <tr className="expanded-row">
-                  <td colSpan={6}>
-                    <div className="details-grid">
-                      <div>
-                        <strong>Inventory Dec 31:</strong>
-                        <p>Qty: {item.inventoryDec31?.qty || 0}</p>
-                        <p>Unit Price: ₱{item.inventoryDec31?.unitPrice || 0}</p>
-                        <p>Total: ₱{item.inventoryDec31?.total || 0}</p>
-                      </div>
+        {filteredInventory.length === 0 && (
+          <p className="empty-state">No inventory items found</p>
+        )}
 
-                      <div>
-                        <strong>Additions:</strong>
-                        <p>Qty: {item.additions?.qty || 0}</p>
-                        <p>Unit Price: ₱{item.additions?.unitPrice || 0}</p>
-                        <p>Total: ₱{item.additions?.total || 0}</p>
-                      </div>
+        {filteredInventory.map((item = {}) => (
 
-                      <div>
-                        <strong>Issuances:</strong>
-                        <p>Qty: {item.issuances?.qty || 0}</p>
-                        <p>Unit Price: ₱{item.issuances?.unitPrice || 0}</p>
-                        <p>Total: ₱{item.issuances?.total || 0}</p>
-                      </div>
+          <div key={item._id} className="inventory-card">
 
-                      <div>
-                        <strong>Balances:</strong>
-                        <p>Qty: {item.balances?.qty || 0}</p>
-                        <p>Unit Price: ₱{item.balances?.unitPrice || 0}</p>
-                        <p>Total: ₱{item.balances?.total || 0}</p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </React.Fragment>
-          ))}
+            <div className="inventory-header-row">
 
-          {filteredInventory.length === 0 && (
-            <tr>
-              <td colSpan={6}>No items found</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+              <div>
+                <h3>{item.name || "Unnamed Item"}</h3>
+                <span className="category-badge">{item.category || "None"}</span>
+                <span className="unit-badge">{item.unit || "N/A"}</span>
+              </div>
 
-      {/* Add Item Modal */}
-      {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content large" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add New Inventory Item</h2>
-              <button className="close-btn" onClick={() => setShowAddModal(false)}>×</button>
+              <div className="stock-info">
+                <span className="stock-value">{item.stock || 0}</span>
+                <span className="stock-label">in stock</span>
+              </div>
+
             </div>
 
-            <div className="modal-body">
-              <div className="form-section">
-                <h3>Basic Information</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Item Name *</label>
-                    <input
-                      type="text"
-                      name="itemName"
-                      value={formData.itemName}
-                      onChange={handleInputChange}
-                      placeholder="Enter item name"
-                      required
-                    />
-                  </div>
+            <div className="summary-row">
 
-                  <div className="form-group">
-                    <label>Unit *</label>
-                    <input
-                      type="text"
-                      name="unit"
-                      value={formData.unit}
-                      onChange={handleInputChange}
-                      placeholder="e.g., pieces, boxes, reams"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Category *</label>
-                  <input
-                    type="text"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    placeholder="Enter category"
-                    required
-                  />
-                </div>
+              <div className="summary-item">
+                <label>Unit Price</label>
+                <span>{formatCurrency(item.unitPrice)}</span>
               </div>
 
-              <div className="form-section">
-                <h3>Opening Inventory (as of Dec 31)</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Quantity</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.inventoryDec31.qty}
-                      onChange={(e) => handleNestedChange('inventoryDec31', 'qty', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Unit Price (₱)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.inventoryDec31.unitPrice}
-                      onChange={(e) => handleNestedChange('inventoryDec31', 'unitPrice', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Total (₱)</label>
-                    <input
-                      type="number"
-                      value={formData.inventoryDec31.total.toFixed(2)}
-                      disabled
-                      className="calculated-field"
-                    />
-                  </div>
-                </div>
+              <div className="summary-item">
+                <label>Total Value</label>
+                <span>{formatCurrency((item.stock || 0) * (item.unitPrice || 0))}</span>
               </div>
 
-              <div className="form-section">
-                <h3>Additions (Current Period)</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Quantity</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.additions.qty}
-                      onChange={(e) => handleNestedChange('additions', 'qty', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Unit Price (₱)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.additions.unitPrice}
-                      onChange={(e) => handleNestedChange('additions', 'unitPrice', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Total (₱)</label>
-                    <input
-                      type="number"
-                      value={formData.additions.total.toFixed(2)}
-                      disabled
-                      className="calculated-field"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-section">
-                <h3>Issuances (Current Period)</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Quantity</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.issuances.qty}
-                      onChange={(e) => handleNestedChange('issuances', 'qty', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Unit Price (₱)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.issuances.unitPrice}
-                      onChange={(e) => handleNestedChange('issuances', 'unitPrice', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Total (₱)</label>
-                    <input
-                      type="number"
-                      value={formData.issuances.total.toFixed(2)}
-                      disabled
-                      className="calculated-field"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-section summary">
-                <h3>Current Balances (Calculated)</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Quantity</label>
-                    <input
-                      type="number"
-                      value={formData.balances.qty}
-                      disabled
-                      className="calculated-field"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Avg. Unit Price (₱)</label>
-                    <input
-                      type="number"
-                      value={formData.balances.unitPrice.toFixed(2)}
-                      disabled
-                      className="calculated-field"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Total Value (₱)</label>
-                    <input
-                      type="number"
-                      value={formData.balances.total.toFixed(2)}
-                      disabled
-                      className="calculated-field"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
 
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowAddModal(false)}>
-                Cancel
-              </button>
-              <button className="btn-primary" onClick={handleAddItem}>
-                Add Item
+            {expandedRows.includes(item._id) && (
+
+              <div className="details-grid">
+
+                <div className="detail-section">
+                  <h4>Inventory Dec 31</h4>
+                  <p>Qty: {getNestedValue(item, "inventoryDec31", "qty")}</p>
+                  <p>Unit Price: {formatCurrency(getNestedValue(item, "inventoryDec31", "unitPrice"))}</p>
+                  <p>Total: {formatCurrency(getNestedValue(item, "inventoryDec31", "total"))}</p>
+                </div>
+
+                <div className="detail-section">
+                  <h4>Additions</h4>
+                  <p>Qty: {getNestedValue(item, "additions", "qty")}</p>
+                  <p>Unit Price: {formatCurrency(getNestedValue(item, "additions", "unitPrice"))}</p>
+                  <p>Total: {formatCurrency(getNestedValue(item, "additions", "total"))}</p>
+                </div>
+
+                <div className="detail-section">
+                  <h4>Issuances</h4>
+                  <p>Qty: {getNestedValue(item, "issuances", "qty")}</p>
+                  <p>Unit Price: {formatCurrency(getNestedValue(item, "issuances", "unitPrice"))}</p>
+                  <p>Total: {formatCurrency(getNestedValue(item, "issuances", "total"))}</p>
+                </div>
+
+                <div className="detail-section">
+                  <h4>Balances</h4>
+                  <p>Qty: {getNestedValue(item, "balances", "qty")}</p>
+                  <p>Unit Price: {formatCurrency(getNestedValue(item, "balances", "unitPrice"))}</p>
+                  <p>Total: {formatCurrency(getNestedValue(item, "balances", "total"))}</p>
+                </div>
+
+              </div>
+
+            )}
+
+            <div className="inventory-actions">
+              <button
+                className="btn-details"
+                onClick={() => toggleRow(item._id)}
+              >
+                {expandedRows.includes(item._id)
+                  ? "− Hide Details"
+                  : "+ Show Details"}
               </button>
             </div>
+
           </div>
-        </div>
-      )}
+
+        ))}
+
+      </div>
+
     </div>
   );
 };
 
-export default InventoryTable;
+export default ListOfSupplies;
