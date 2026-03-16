@@ -32,8 +32,15 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['SuperAdmin', 'Admin', 'Approver', 'Employee'],
-        default: 'Employee'
+        enum: ['superadmin', 'admin', 'approver', 'employee'],
+        default: 'employee',
+        lowercase: true,
+        trim: true
+    },
+    status: {
+        type: String,
+        enum: ['active', 'inactive', 'suspended'],
+        default: 'active'
     },
     password: {
         type: String,
@@ -49,26 +56,24 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-
+// Pre-save middleware
 userSchema.pre('save', async function (next) {
     try {
-        // Enforce single SuperAdmin
-        if (this.role === 'SuperAdmin') {
-            const existingSuperAdmin = await this.constructor.findOne({ role: 'SuperAdmin' });
-            if (existingSuperAdmin && existingSuperAdmin._id.toString() !== this._id.toString()) {
-                return next(new Error('There can only be one SuperAdmin'));
-            }
-        }
-
-        // Hash password only if modified
+        // Only hash password if it's modified
         if (this.isModified('password')) {
             const salt = await bcrypt.genSalt(10);
             this.password = await bcrypt.hash(this.password, salt);
         }
 
-        // Update timestamp
-        this.updatedAt = Date.now();
+        // Enforce single SuperAdmin
+        if (this.role === 'superadmin') {
+            const existingSuperAdmin = await this.constructor.findOne({ role: 'superadmin' });
+            if (existingSuperAdmin && existingSuperAdmin._id.toString() !== this._id.toString()) {
+                return next(new Error('There can only be one SuperAdmin in the system'));
+            }
+        }
 
+        this.updatedAt = Date.now();
         next();
     } catch (error) {
         next(error);
@@ -78,6 +83,13 @@ userSchema.pre('save', async function (next) {
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Convert to JSON method to exclude password
+userSchema.methods.toJSON = function () {
+    const user = this.toObject();
+    delete user.password;
+    return user;
 };
 
 const User = mongoose.model('User', userSchema);

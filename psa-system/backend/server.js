@@ -2,13 +2,14 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const User = require('./models/User');
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs'); // Changed from 'bcrypt' to 'bcryptjs' for consistency
 const mongoose = require('mongoose');
 
 const { connectDB, PORT } = require('./config/db');
 const authRoutes = require('./routes/auth');
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const requisitionRoutes = require("./routes/requisitionRoutes");
+const userRoutes = require("./routes/userRoutes"); // Add this if you have user management routes
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 app.use("/api/inventories", inventoryRoutes);
 app.use("/api/requisitions", requisitionRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes); // Add user routes
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -49,20 +51,33 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Seed SuperAdmin
+// Seed SuperAdmin (using lowercase role)
 const seedSuperAdmin = async () => {
-    const adminExist = await User.findOne({ role: "SuperAdmin" });
-    if (!adminExist) {
-        const hashedPassword = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, 10);
-        await User.create({
-            fullName: "System SuperAdmin",
-            employeeId: "SUPER001",
-            email: process.env.SUPER_ADMIN_EMAIL,
-            department: "Finance and Admin Unit",
-            password: process.env.SUPER_ADMIN_PASSWORD,
-            role: "SuperAdmin"
-        });
-        console.log("Super Admin Created!");
+    try {
+        const adminExist = await User.findOne({ role: "superadmin" });
+        if (!adminExist) {
+            // Check if environment variables exist
+            if (!process.env.SUPER_ADMIN_EMAIL || !process.env.SUPER_ADMIN_PASSWORD) {
+                console.log('⚠️ SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD not set in .env file');
+                return;
+            }
+
+            const hashedPassword = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, 10);
+            await User.create({
+                fullName: "System SuperAdmin",
+                employeeId: "SUPER001",
+                email: process.env.SUPER_ADMIN_EMAIL,
+                department: "Finance and Admin Unit",
+                password: hashedPassword, // Use hashed password, not plain text
+                role: "superadmin", // lowercase
+                status: "active"
+            });
+            console.log("✅ Super Admin Created with role: superadmin");
+        } else {
+            console.log("✅ Super Admin already exists");
+        }
+    } catch (error) {
+        console.error('❌ Error seeding SuperAdmin:', error);
     }
 };
 
@@ -72,11 +87,12 @@ const startServer = async () => {
         await connectDB();
         await seedSuperAdmin();
         app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-            console.log(`MongoDB connection state: ${mongoose.connection.readyState}`);
+            console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`📊 MongoDB connection state: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+            console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
         });
     } catch (error) {
-        console.error('Failed to start server:', error);
+        console.error('❌ Failed to start server:', error);
         process.exit(1);
     }
 };

@@ -25,31 +25,56 @@ const register = async (req, res) => {
         // Validate required fields
         if (!fullName || !employeeId || !email || !department || !password) {
             return res.status(400).json({
+                success: false,
                 message: 'All fields are required'
             });
         }
 
         // Check if user already exists
         const existingUser = await User.findOne({
-            $or: [{ email }, { employeeId }]
+            $or: [{ email: email.toLowerCase() }, { employeeId }]
         });
 
         if (existingUser) {
             return res.status(400).json({
-                message: existingUser.email === email
+                success: false,
+                message: existingUser.email === email.toLowerCase()
                     ? 'Email already registered'
                     : 'Employee ID already registered'
             });
+        }
+
+        // Convert role to lowercase and validate
+        const userRole = role ? role.toLowerCase() : 'employee';
+        const validRoles = ['superadmin', 'admin', 'approver', 'employee'];
+
+        if (!validRoles.includes(userRole)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid role specified'
+            });
+        }
+
+        // Check SuperAdmin constraint
+        if (userRole === 'superadmin') {
+            const existingSuperAdmin = await User.findOne({ role: 'superadmin' });
+            if (existingSuperAdmin) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'There can only be one SuperAdmin in the system'
+                });
+            }
         }
 
         // Create new user
         const user = new User({
             fullName,
             employeeId,
-            email,
+            email: email.toLowerCase(),
             department,
-            role: role || 'Requester',
-            password
+            role: userRole,
+            password,
+            status: 'active'
         });
 
         await user.save();
@@ -60,6 +85,7 @@ const register = async (req, res) => {
         console.log('✅ User registered:', user.email);
 
         res.status(201).json({
+            success: true,
             message: 'Account created successfully',
             token,
             user: {
@@ -68,7 +94,8 @@ const register = async (req, res) => {
                 email: user.email,
                 employeeId: user.employeeId,
                 department: user.department,
-                role: user.role
+                role: user.role,
+                status: user.status
             }
         });
 
@@ -78,11 +105,21 @@ const register = async (req, res) => {
         if (error.code === 11000) {
             const field = Object.keys(error.keyPattern)[0];
             return res.status(400).json({
+                success: false,
                 message: `${field} already exists`
             });
         }
 
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({
+                success: false,
+                message: messages.join(', ')
+            });
+        }
+
         res.status(500).json({
+            success: false,
             message: 'Server error during registration'
         });
     }
@@ -97,7 +134,10 @@ const login = async (req, res) => {
 
         // Validate input
         if (!email || !password) {
-            return res.status(400).json({ message: 'Please provide email and password' });
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide email and password'
+            });
         }
 
         // Find user by email
@@ -105,7 +145,18 @@ const login = async (req, res) => {
 
         if (!user) {
             console.log('❌ User not found:', email);
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
+        }
+
+        // Check if account is active
+        if (user.status === 'inactive' || user.status === 'suspended') {
+            return res.status(403).json({
+                success: false,
+                message: `Account is ${user.status}. Please contact administrator.`
+            });
         }
 
         // Check password
@@ -113,7 +164,10 @@ const login = async (req, res) => {
 
         if (!isMatch) {
             console.log('❌ Invalid password for:', email);
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
         }
 
         // Generate token
@@ -122,6 +176,7 @@ const login = async (req, res) => {
         console.log('✅ Login successful:', email, 'Role:', user.role);
 
         res.json({
+            success: true,
             message: 'Login successful',
             token,
             user: {
@@ -130,13 +185,17 @@ const login = async (req, res) => {
                 email: user.email,
                 employeeId: user.employeeId,
                 department: user.department,
-                role: user.role
+                role: user.role,
+                status: user.status
             }
         });
 
     } catch (error) {
         console.error('❌ Login error:', error);
-        res.status(500).json({ message: 'Server error during login' });
+        res.status(500).json({
+            success: false,
+            message: 'Server error during login'
+        });
     }
 };
 
@@ -146,13 +205,22 @@ const getCurrentUser = async (req, res) => {
         const user = await User.findById(req.user.id).select('-password');
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
         }
 
-        res.json({ user });
+        res.json({
+            success: true,
+            user
+        });
     } catch (error) {
         console.error('❌ Get current user error:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
     }
 };
 

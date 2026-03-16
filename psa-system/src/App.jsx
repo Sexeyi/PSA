@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './Components/Sidebar'
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard'
@@ -159,8 +159,22 @@ function App() {
   const [users, setUsers] = useState([])
   const [requisitions, setRequisitions] = useState([])
 
-  // Get menu items based on user role
-  const [menuItems, setMenuItems] = useState([])
+  // Get menu items based on user role - FIXED: use useMemo instead of useEffect
+  const menuItems = useMemo(() => {
+    if (user?.role) {
+      console.log('🎯 Computing menu for role:', user.role);
+      return sidebarMenus[user.role] || sidebarMenus.Employee;
+    }
+    return [];
+  }, [user?.role]);
+
+  // Set default view based on role when menu changes - FIXED: separate useEffect
+  useEffect(() => {
+    if (menuItems.length > 0 && !menuItems.includes(currentView)) {
+      console.log('🔄 Setting default view to:', menuItems[0]);
+      setCurrentView(menuItems[0]);
+    }
+  }, [menuItems, currentView]);
 
   // Debug effect to log state changes
   useEffect(() => {
@@ -173,37 +187,6 @@ function App() {
       suppliesCount: supplies.length
     });
   }, [isLoggedIn, user, menuItems, currentView, supplies]);
-
-  // Update menu items when user changes - FIXED to avoid warning
-  useEffect(() => {
-    if (user?.role) {
-      console.log('🎯 Updating menu for role:', user.role);
-      console.log('📋 Available menus:', sidebarMenus);
-
-      const items = sidebarMenus[user.role] || sidebarMenus.Employee;
-      console.log('✅ Selected menu items:', items);
-
-      // Use a timeout to break the synchronous state update
-      const timeoutId = setTimeout(() => {
-        setMenuItems(items);
-      }, 0);
-
-      // Set default view based on role
-      if (!items.includes(currentView)) {
-        setTimeout(() => {
-          console.log('🔄 Setting default view to:', items[0]);
-          setCurrentView(items[0]);
-        }, 0);
-      }
-
-      return () => clearTimeout(timeoutId);
-    } else {
-      const timeoutId = setTimeout(() => {
-        setMenuItems([]);
-      }, 0);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [user, currentView]); // Added currentView dependency
 
   // Load user data from localStorage on mount
   useEffect(() => {
@@ -302,7 +285,6 @@ function App() {
     localStorage.clear();
     setIsLoggedIn(false);
     setUser(null);
-    setMenuItems([]);
     setCurrentView('Dashboard');
     setSupplies([]);
     setUsers([]);
