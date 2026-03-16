@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './Components/Sidebar'
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard'
@@ -12,12 +12,14 @@ import SignIn from './pages/auth/SignIn'
 import Navbar from './Components/Navbar'
 import UserManagement from './pages/superadmin/UserManagement'
 import MyRequests from './pages/employee/MyRequests'
+import InventoryTable from './pages/admin/InventoryTable'  // ✅ Keep this import
 
-// Sidebar menu configuration based on role
+// Sidebar menu configuration based on role - USING LOWERCASE FOR CONSISTENCY
 const sidebarMenus = {
-  SuperAdmin: ["Dashboard", "Supplies", "User Management"],
-  Admin: ["Dashboard", "Requisitions", "Supplies"],
-  Employee: ["Dashboard", "MyRequests"]
+  superadmin: ["Dashboard", "Supplies", "User Management"],
+  admin: ["Dashboard", "Requisitions", "Supplies"],
+  approver: ["Dashboard", "Requisitions"],
+  employee: ["Dashboard", "MyRequests"]
 };
 
 // MainContent component declared outside of App
@@ -38,51 +40,42 @@ function MainContent({
   }, [user, menuItems, currentView]);
 
   const renderContent = () => {
-    const userRole = user?.role || 'Employee';
+    const userRole = user?.role?.toLowerCase() || 'employee';
     console.log('🎯 Rendering for role:', userRole, 'View:', currentView);
 
     switch (currentView) {
       case 'Dashboard':
-        if (userRole === 'SuperAdmin') {
-          return <SuperAdminDashboard
-            totalSupplies={supplies?.length || 0}
-            userRole={userRole}
-            user={user}
-          />;
-        } else if (userRole === 'Admin') {
+        if (userRole === 'superadmin') {
+          return <SuperAdminDashboard user={user} />;
+        } else if (userRole === 'admin' || userRole === 'approver') {
           return <AdminDashboard user={user} />;
         } else {
           return <EmployeeDashboard user={user} />;
         }
 
       case 'Supplies':
-        console.log('📦 Rendering ListOfSupplies with supplies:', supplies);
-        return <ListOfSupplies
-          supplies={supplies || []}
-          setSupplies={setSupplies}
-          userRole={userRole}
-        />;
+        console.log('📦 Rendering InventoryTable');
+        // ✅ FIXED: Use the new InventoryTable component
+        return <InventoryTable />;
 
       case 'User Management':
-        return userRole === 'SuperAdmin' ? <UserManagement /> : <Navigate to="/dashboard" />;
+        return userRole === 'superadmin' ? <UserManagement /> : <Navigate to="/dashboard" />;
 
       case 'Requisitions':
-        return userRole === 'Admin' ? <ApproveRequests /> : <Navigate to="/dashboard" />;
+        return (userRole === 'admin' || userRole === 'approver' || userRole === 'superadmin')
+          ? <ApproveRequests user={user} />
+          : <Navigate to="/dashboard" />;
 
       case 'MyRequests':
-        return userRole === 'Employee' ? <MyRequests user={user} /> : <Navigate to="/dashboard" />;
+        return userRole === 'employee' ? <MyRequests user={user} /> : <Navigate to="/dashboard" />;
 
       case 'Profile':
         return <Profile user={user} />;
 
       default:
-        if (userRole === 'SuperAdmin') {
-          return <SuperAdminDashboard
-            totalSupplies={supplies?.length || 0}
-            userRole={userRole}
-            user={user}
-          />;
-        } else if (userRole === 'Admin') {
+        if (userRole === 'superadmin') {
+          return <SuperAdminDashboard user={user} />;
+        } else if (userRole === 'admin' || userRole === 'approver') {
           return <AdminDashboard user={user} />;
         } else {
           return <EmployeeDashboard user={user} />;
@@ -159,22 +152,30 @@ function App() {
   const [users, setUsers] = useState([])
   const [requisitions, setRequisitions] = useState([])
 
-  // Get menu items based on user role - FIXED: use useMemo instead of useEffect
+  // Get menu items based on user role - using lowercase for consistency
   const menuItems = useMemo(() => {
     if (user?.role) {
-      console.log('🎯 Computing menu for role:', user.role);
-      return sidebarMenus[user.role] || sidebarMenus.Employee;
+      const role = user.role.toLowerCase();
+      console.log('🎯 Computing menu for role:', role);
+      return sidebarMenus[role] || sidebarMenus.employee;
     }
     return [];
   }, [user?.role]);
 
-  // Set default view based on role when menu changes - FIXED: separate useEffect
-  useEffect(() => {
+  // ✅ FIXED: Derive view during render instead of using useEffect
+  const derivedView = useMemo(() => {
     if (menuItems.length > 0 && !menuItems.includes(currentView)) {
-      console.log('🔄 Setting default view to:', menuItems[0]);
-      setCurrentView(menuItems[0]);
+      console.log('🔄 Default view should be:', menuItems[0]);
+      return menuItems[0];
     }
+    return currentView;
   }, [menuItems, currentView]);
+
+  // Update during render if needed (this is the recommended pattern)
+  if (derivedView !== currentView) {
+    console.log('🔄 Setting view to:', derivedView);
+    setCurrentView(derivedView);
+  }
 
   // Debug effect to log state changes
   useEffect(() => {
@@ -201,34 +202,6 @@ function App() {
           console.error('❌ Error parsing user from localStorage:', e);
         }
       }
-
-      // These should ideally come from API, not localStorage
-      const savedSupplies = localStorage.getItem('supplies');
-      if (savedSupplies) {
-        try {
-          setSupplies(JSON.parse(savedSupplies));
-        } catch (e) {
-          console.error('Error parsing supplies:', e);
-        }
-      }
-
-      const savedUsers = localStorage.getItem('users');
-      if (savedUsers) {
-        try {
-          setUsers(JSON.parse(savedUsers));
-        } catch (e) {
-          console.error('Error parsing users:', e);
-        }
-      }
-
-      const savedRequisitions = localStorage.getItem('requisitions');
-      if (savedRequisitions) {
-        try {
-          setRequisitions(JSON.parse(savedRequisitions));
-        } catch (e) {
-          console.error('Error parsing requisitions:', e);
-        }
-      }
     };
 
     if (isLoggedIn) {
@@ -250,7 +223,16 @@ function App() {
         if (response.ok) {
           const data = await response.json();
           console.log('📦 Fetched supplies from API:', data);
-          setSupplies(data);
+
+          // Handle different response structures
+          let suppliesArray = [];
+          if (Array.isArray(data)) {
+            suppliesArray = data;
+          } else if (data.data && Array.isArray(data.data)) {
+            suppliesArray = data.data;
+          }
+
+          setSupplies(suppliesArray);
         }
       } catch (error) {
         console.error('Error fetching supplies:', error);
