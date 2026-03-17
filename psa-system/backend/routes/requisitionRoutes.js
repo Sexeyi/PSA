@@ -12,6 +12,8 @@ router.get('/my', auth, requisitionController.getMyRequisitions);
 
 router.put('/:id/approve', auth, requisitionController.approveRequisition);
 
+router.put('/:id/issued', auth, requisitionController.issueRequisition);
+
 router.put('/:id/reject', auth, requisitionController.rejectRequisition);
 
 router.get('/:id/pdf', auth, requisitionController.generatePDF);

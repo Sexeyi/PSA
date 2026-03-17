@@ -104,7 +104,7 @@ const UserManagement = () => {
             employeeId: '',
             email: '',
             department: '',
-            role: 'employee', // Changed to lowercase
+            role: 'employee',
             password: ''
         });
         setShowModal(true);
@@ -118,8 +118,8 @@ const UserManagement = () => {
             employeeId: user.employeeId || '',
             email: user.email || '',
             department: user.department || '',
-            role: user.role || 'employee', // User role should already be lowercase from backend
-            password: '' // Don't populate password for security
+            role: user.role || 'employee',
+            password: ''
         });
         setShowModal(true);
     };
@@ -191,7 +191,7 @@ const UserManagement = () => {
                 employeeId: formData.employeeId.trim(),
                 email: formData.email.trim().toLowerCase(),
                 department: formData.department,
-                role: formData.role.toLowerCase(), // Ensure role is lowercase
+                role: formData.role.toLowerCase(),
             };
 
             // Add password only for new users or if changed

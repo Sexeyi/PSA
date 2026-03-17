@@ -6,18 +6,19 @@ import EmployeeDashboard from './pages/employee/EmployeeDashboard'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ListOfSupplies from './pages/superadmin/ListOfSupplies'
 import ApproveRequests from './pages/admin/ApproveRequests'
+import RequestApproval from './pages/superadmin/RequestApproval' // ✅ Import Request Approval
 import Profile from './Components/Profile'
 import Login from './pages/auth/Login'
 import SignIn from './pages/auth/SignIn'
 import Navbar from './Components/Navbar'
 import UserManagement from './pages/superadmin/UserManagement'
 import MyRequests from './pages/employee/MyRequests'
-import InventoryTable from './pages/admin/InventoryTable'  // ✅ Keep this import
+import InventoryTable from './pages/admin/InventoryTable'
 
 // Sidebar menu configuration based on role - USING LOWERCASE FOR CONSISTENCY
 const sidebarMenus = {
-  superadmin: ["Dashboard", "Supplies", "User Management"],
-  admin: ["Dashboard", "Requisitions", "Supplies"],
+  superadmin: ["Dashboard", "Supplies", "User Management", "Request Approval"], // ✅ Added Request Approval
+  admin: ["Dashboard", "Requisitions", "Supplies", "Inventory"],
   approver: ["Dashboard", "Requisitions"],
   employee: ["Dashboard", "MyRequests"]
 };
@@ -55,8 +56,10 @@ function MainContent({
 
       case 'Supplies':
         console.log('📦 Rendering InventoryTable');
-        // ✅ FIXED: Use the new InventoryTable component
         return <InventoryTable />;
+
+      case 'Request Approval':
+        return userRole === 'superadmin' ? <RequestApproval /> : <Navigate to="/dashboard" />;
 
       case 'User Management':
         return userRole === 'superadmin' ? <UserManagement /> : <Navigate to="/dashboard" />;
@@ -162,7 +165,7 @@ function App() {
     return [];
   }, [user?.role]);
 
-  // ✅ FIXED: Derive view during render instead of using useEffect
+  // ✅ Derive view during render instead of using useEffect
   const derivedView = useMemo(() => {
     if (menuItems.length > 0 && !menuItems.includes(currentView)) {
       console.log('🔄 Default view should be:', menuItems[0]);

@@ -10,15 +10,21 @@ const AdminDashboard = () => {
 
     const [requisitions, setRequisitions] = useState([]);
     const [inventory, setInventory] = useState([]);
+    const [users, setUsers] = useState([]);
     const [inventoryError, setInventoryError] = useState(null);
+    const [requisitionError, setRequisitionError] = useState(null);
     const [stats, setStats] = useState({
         totalSupplies: 0,
         lowStockCount: 0,
         pendingCount: 0,
         approvedCount: 0,
         issuedToday: 0,
-        totalValue: 0
+        totalValue: 0,
+        totalUsers: 0,
+        totalRequisitions: 0
     });
+
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
     useEffect(() => {
         const userData = localStorage.getItem('user');
@@ -35,101 +41,99 @@ const AdminDashboard = () => {
         } catch (error) {
             console.error('Error parsing user data:', error);
             navigate('/login');
-        } finally {
-            setLoading(false);
         }
     }, [navigate]);
 
-    // Fetch requisitions and inventory
+    // Fetch all data from database
     useEffect(() => {
         const token = localStorage.getItem('token');
 
-        const fetchData = async () => {
+        const fetchAllData = async () => {
             try {
                 setLoading(true);
                 setError(null);
                 setInventoryError(null);
+                setRequisitionError(null);
 
                 const headers = {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 };
 
-                const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+                // Fetch all data in parallel
+                const [inventoryRes, requisitionsRes, usersRes] = await Promise.allSettled([
+                    fetch(`${API_BASE_URL}/api/inventories`, { headers }),
+                    fetch(`${API_BASE_URL}/api/requisitions`, { headers }),
+                    fetch(`${API_BASE_URL}/api/users`, { headers })
+                ]);
 
-                // Fetch requisitions
-                try {
-                    const reqResponse = await fetch(`${API_BASE_URL}/api/requisitions`, { headers });
+                // Process inventory data
+                if (inventoryRes.status === 'fulfilled' && inventoryRes.value.ok) {
+                    const inventoryData = await inventoryRes.value.json();
+                    console.log('Inventory data received:', inventoryData);
 
-                    if (!reqResponse.ok) {
-                        console.error('Requisitions fetch failed:', reqResponse.status);
-                    } else {
-                        const requisitionsData = await reqResponse.json();
-
-                        // Extract requisitions array
-                        let requisitionsArray = [];
-                        if (requisitionsData.data && Array.isArray(requisitionsData.data)) {
-                            requisitionsArray = requisitionsData.data;
-                        } else if (requisitionsData.requests && Array.isArray(requisitionsData.requests)) {
-                            requisitionsArray = requisitionsData.requests;
-                        } else if (Array.isArray(requisitionsData)) {
-                            requisitionsArray = requisitionsData;
-                        }
-
-                        setRequisitions(requisitionsArray);
+                    let inventoryArray = [];
+                    if (Array.isArray(inventoryData)) {
+                        inventoryArray = inventoryData;
+                    } else if (inventoryData.data && Array.isArray(inventoryData.data)) {
+                        inventoryArray = inventoryData.data;
+                    } else if (inventoryData.inventories && Array.isArray(inventoryData.inventories)) {
+                        inventoryArray = inventoryData.inventories;
                     }
-                } catch (reqError) {
-                    console.error('Error fetching requisitions:', reqError);
+
+                    setInventory(inventoryArray);
+                } else {
+                    console.error('Failed to fetch inventory:', inventoryRes.reason || 'API error');
+                    setInventoryError('Failed to load inventory data');
                 }
 
-                // Fetch inventory
-                try {
-                    console.log('Fetching inventory from:', `${API_BASE_URL}/api/inventories`);
+                // Process requisitions data
+                if (requisitionsRes.status === 'fulfilled' && requisitionsRes.value.ok) {
+                    const requisitionsData = await requisitionsRes.value.json();
+                    console.log('Requisitions data received:', requisitionsData);
 
-                    const invResponse = await fetch(`${API_BASE_URL}/api/inventories`, { headers });
-
-                    if (!invResponse.ok) {
-                        console.error('Inventory fetch failed with status:', invResponse.status);
-                        setInventoryError(`Inventory API returned ${invResponse.status}`);
-                        setInventory([]);
-                    } else {
-                        const inventoryData = await invResponse.json();
-                        console.log('Inventory data received:', inventoryData);
-
-                        let inventoryArray = [];
-
-                        if (Array.isArray(inventoryData)) {
-                            inventoryArray = inventoryData;
-                            console.log('✅ Inventory is a direct array with', inventoryArray.length, 'items');
-                        } else if (inventoryData.data && Array.isArray(inventoryData.data)) {
-                            inventoryArray = inventoryData.data;
-                        } else if (inventoryData.inventories && Array.isArray(inventoryData.inventories)) {
-                            inventoryArray = inventoryData.inventories;
-                        }
-
-                        setInventory(inventoryArray);
-
-                        // Log sample item structure to help with field names
-                        if (inventoryArray.length > 0) {
-                            console.log('Sample inventory item structure:', inventoryArray[0]);
-                        }
+                    let requisitionsArray = [];
+                    if (requisitionsData.data && Array.isArray(requisitionsData.data)) {
+                        requisitionsArray = requisitionsData.data;
+                    } else if (requisitionsData.requests && Array.isArray(requisitionsData.requests)) {
+                        requisitionsArray = requisitionsData.requests;
+                    } else if (Array.isArray(requisitionsData)) {
+                        requisitionsArray = requisitionsData;
                     }
-                } catch (invError) {
-                    console.error('Error fetching inventory:', invError);
-                    setInventoryError(invError.message);
-                    setInventory([]);
+
+                    setRequisitions(requisitionsArray);
+                } else {
+                    console.error('Failed to fetch requisitions:', requisitionsRes.reason || 'API error');
+                    setRequisitionError('Failed to load requisition data');
+                }
+
+                // Process users data
+                if (usersRes.status === 'fulfilled' && usersRes.value.ok) {
+                    const usersData = await usersRes.value.json();
+                    console.log('Users data received:', usersData);
+
+                    let usersArray = [];
+                    if (Array.isArray(usersData)) {
+                        usersArray = usersData;
+                    } else if (usersData.data && Array.isArray(usersData.data)) {
+                        usersArray = usersData.data;
+                    } else if (usersData.users && Array.isArray(usersData.users)) {
+                        usersArray = usersData.users;
+                    }
+
+                    setUsers(usersArray);
                 }
 
             } catch (error) {
-                console.error('Error in fetchData:', error);
-                setError('Failed to load some dashboard data');
+                console.error('Error in fetchAllData:', error);
+                setError('Failed to load dashboard data');
             } finally {
                 setLoading(false);
             }
         };
 
         if (token) {
-            fetchData();
+            fetchAllData();
         }
     }, []);
 
@@ -164,9 +168,19 @@ const AdminDashboard = () => {
         const today = new Date().toISOString().split('T')[0];
         const issuedToday = (requisitions || []).filter(req => {
             if (!req.issuedDate) return false;
-            const issuedDate = new Date(req.issuedDate).toISOString().split('T')[0];
-            return issuedDate === today && req.status?.toLowerCase() === 'issued';
+            try {
+                const issuedDate = new Date(req.issuedDate).toISOString().split('T')[0];
+                return issuedDate === today && req.status?.toLowerCase() === 'issued';
+            } catch {
+                return false;
+            }
         }).length;
+
+        // Total requisitions
+        const totalRequisitions = requisitions?.length || 0;
+
+        // Total users
+        const totalUsers = users?.length || 0;
 
         setStats({
             totalSupplies,
@@ -174,9 +188,11 @@ const AdminDashboard = () => {
             pendingCount,
             approvedCount,
             issuedToday,
-            totalValue
+            totalValue,
+            totalUsers,
+            totalRequisitions
         });
-    }, [inventory, requisitions]);
+    }, [inventory, requisitions, users]);
 
     // Calendar helpers
     const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
@@ -206,28 +222,32 @@ const AdminDashboard = () => {
                 month === new Date().getMonth() &&
                 year === new Date().getFullYear();
 
-            // Check if this date has any requisitions issued
+            // Check if this date has any requisitions
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const hasEvents = requisitions.some(r => {
-                if (!r.issuedDate) return false;
+
+            // Count events on this date
+            const eventsOnDate = requisitions.filter(r => {
+                if (!r.createdAt && !r.issuedDate) return false;
                 try {
-                    const issuedDate = new Date(r.issuedDate).toISOString().split('T')[0];
-                    return issuedDate === dateStr;
+                    const eventDate = r.issuedDate || r.createdAt;
+                    const eventDateStr = new Date(eventDate).toISOString().split('T')[0];
+                    return eventDateStr === dateStr;
                 } catch {
                     return false;
                 }
-            });
+            }).length;
 
             days.push(
                 <div
                     key={d}
                     className={`h-10 w-10 flex items-center justify-center rounded-full cursor-pointer relative
                         ${isToday ? 'bg-blue-600 text-white font-bold' : 'hover:bg-gray-100'}
-                        ${hasEvents ? 'ring-2 ring-green-500 ring-offset-2' : ''}
+                        ${eventsOnDate > 0 ? 'ring-2 ring-green-500 ring-offset-2' : ''}
                     `}
+                    title={`${eventsOnDate} event(s) on this day`}
                 >
                     {d}
-                    {hasEvents && (
+                    {eventsOnDate > 0 && (
                         <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full"></span>
                     )}
                 </div>
@@ -288,6 +308,18 @@ const AdminDashboard = () => {
         .sort((a, b) => (a.stock || 0) - (b.stock || 0))
         .slice(0, 5);
 
+    // Get recent activities
+    const recentActivities = (requisitions || [])
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 5)
+        .map(req => ({
+            id: req._id,
+            type: req.status,
+            description: `${req.requestedByDetails?.fullName || 'Someone'} requested ${req.items?.length || 0} item(s)`,
+            time: formatDate(req.createdAt),
+            amount: req.totalAmount
+        }));
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -318,9 +350,9 @@ const AdminDashboard = () => {
                 </p>
             </div>
 
-            {/* Warning Banner */}
+            {/* Warning Banners */}
             {inventoryError && (
-                <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
                     <div className="flex">
                         <div className="shrink-0">
                             <span className="text-yellow-400 text-xl">⚠️</span>
@@ -334,15 +366,30 @@ const AdminDashboard = () => {
                 </div>
             )}
 
-            {/* Stats Cards */}
+            {requisitionError && (
+                <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                    <div className="flex">
+                        <div className="shrink-0">
+                            <span className="text-yellow-400 text-xl">⚠️</span>
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-yellow-700">
+                                Requisition data unavailable: {requisitionError}. Showing limited dashboard.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Stats Cards - Enhanced with real data */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-all">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-gray-500 uppercase">Total Supplies</p>
                             <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalSupplies}</p>
-                            <p className="text-sm text-green-600 mt-2 flex items-center">
-                                <span>📦</span> Unique items
+                            <p className="text-sm text-blue-600 mt-2 flex items-center">
+                                <span>📦</span> Across {inventory.length} categories
                             </p>
                         </div>
                         <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -356,7 +403,7 @@ const AdminDashboard = () => {
                         <div>
                             <p className="text-sm font-medium text-gray-500 uppercase">Inventory Value</p>
                             <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(stats.totalValue)}</p>
-                            <p className="text-sm text-blue-600 mt-2 flex items-center">
+                            <p className="text-sm text-green-600 mt-2 flex items-center">
                                 <span>💰</span> Total stock value
                             </p>
                         </div>
@@ -369,14 +416,14 @@ const AdminDashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-all">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-500 uppercase">Pending Approval</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{stats.pendingCount}</p>
-                            <p className="text-sm text-yellow-600 mt-2 flex items-center">
-                                <span>⏳</span> Ready for admin approval
+                            <p className="text-sm font-medium text-gray-500 uppercase">Total Users</p>
+                            <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalUsers}</p>
+                            <p className="text-sm text-purple-600 mt-2 flex items-center">
+                                <span>👥</span> Active in system
                             </p>
                         </div>
-                        <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                            <span className="text-2xl">⏳</span>
+                        <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                            <span className="text-2xl">👥</span>
                         </div>
                     </div>
                 </div>
@@ -384,16 +431,36 @@ const AdminDashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-all">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-500 uppercase">Ready to Issue</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{stats.approvedCount}</p>
-                            <p className="text-sm text-green-600 mt-2 flex items-center">
-                                <span>✅</span> Approved by admin
+                            <p className="text-sm font-medium text-gray-500 uppercase">Total Requisitions</p>
+                            <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalRequisitions}</p>
+                            <p className="text-sm text-orange-600 mt-2 flex items-center">
+                                <span>📋</span> All time requests
                             </p>
                         </div>
-                        <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                            <span className="text-2xl">✅</span>
+                        <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                            <span className="text-2xl">📋</span>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Secondary Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm text-gray-600">Pending Approval</p>
+                    <p className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm text-gray-600">Ready to Issue</p>
+                    <p className="text-2xl font-bold text-green-600">{stats.approvedCount}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm text-gray-600">Issued Today</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.issuedToday}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm text-gray-600">Low Stock Items</p>
+                    <p className="text-2xl font-bold text-red-600">{stats.lowStockCount}</p>
                 </div>
             </div>
 
@@ -426,7 +493,7 @@ const AdminDashboard = () => {
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="text-xs font-mono text-gray-500">
-                                                {req.requisitionNumber}
+                                                {req.requisitionNumber || 'N/A'}
                                             </span>
                                             <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
                                                 Pending Admin
@@ -436,12 +503,12 @@ const AdminDashboard = () => {
                                             {req.requestedByDetails?.fullName || 'Unknown'}
                                         </p>
                                         <p className="text-xs text-gray-600">
-                                            {req.items?.length} item(s) • {formatDate(req.createdAt)}
+                                            {req.items?.length || 0} item(s) • {formatDate(req.createdAt)}
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-lg font-bold text-blue-600">
-                                            {formatCurrency(req.totalAmount)}
+                                            {formatCurrency(req.totalAmount || 0)}
                                         </p>
                                         <p className="text-xs text-gray-500">
                                             {req.requestedByDetails?.department || 'N/A'}
@@ -513,7 +580,7 @@ const AdminDashboard = () => {
                                 >
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-xs font-mono text-gray-500">
-                                            {req.requisitionNumber}
+                                            {req.requisitionNumber || 'N/A'}
                                         </span>
                                         <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs">
                                             Approved
@@ -522,10 +589,10 @@ const AdminDashboard = () => {
                                     <p className="font-medium text-gray-900">{req.requestedByDetails?.fullName}</p>
                                     <div className="flex justify-between items-center mt-2">
                                         <span className="text-sm text-gray-600">
-                                            {req.items?.length} items
+                                            {req.items?.length || 0} items
                                         </span>
                                         <span className="text-lg font-bold text-green-600">
-                                            {formatCurrency(req.totalAmount)}
+                                            {formatCurrency(req.totalAmount || 0)}
                                         </span>
                                     </div>
                                 </div>
@@ -534,38 +601,35 @@ const AdminDashboard = () => {
                     )}
                 </div>
 
-                {/* Today's Activity */}
+                {/* Recent Activity */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Activity</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
 
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-600">Items Issued Today</span>
-                            <span className="text-2xl font-bold text-blue-600">{stats.issuedToday}</span>
+                    {recentActivities.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                            No recent activity
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-600">Pending Approvals</span>
-                            <span className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</span>
+                    ) : (
+                        <div className="space-y-3">
+                            {recentActivities.map(activity => (
+                                <div key={activity.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm
+                                        ${activity.type === 'issued' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                                        {activity.type === 'issued' ? '✅' : '📝'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm text-gray-900">{activity.description}</p>
+                                        <p className="text-xs text-gray-500">{activity.time}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-600">Low Stock Items</span>
-                            <span className="text-2xl font-bold text-red-600">{stats.lowStockCount}</span>
-                        </div>
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t border-gray-200">
-                        <button
-                            onClick={() => navigate('/requisitions?status=approved_by_admin')}
-                            className="w-full py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            Process Issuance
-                        </button>
-                    </div>
+                    )}
                 </div>
 
                 {/* Calendar */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Calendar</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Calendar</h2>
 
                     <div className="calendar">
                         <div className="flex items-center justify-between mb-4">
@@ -604,7 +668,7 @@ const AdminDashboard = () => {
                         </div>
                         <div className="flex items-center gap-1">
                             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                            <span className="text-gray-600">Issuance</span>
+                            <span className="text-gray-600">Activity</span>
                         </div>
                     </div>
                 </div>

@@ -14,7 +14,7 @@ const RequisitionSchema = new mongoose.Schema({
     department: { type: String, required: true },
     items: [ItemSchema],
     notes: { type: String, default: "" },
-    status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+    status: { type: String, enum: ['pending', 'approved', 'rejected', 'issued'], default: 'pending' },
     dateRequested: { type: Date, default: Date.now },
     approvedDate: { type: Date },
     remarks: { type: String, default: "" },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as XLSX from 'xlsx';
 import AddNewSupply from "../../Components/AddNewSupply";
+import EditInventoryModal from "../../Components/EditInventoryModal";
 
 const InventoryTable = () => {
   const [inventory, setInventory] = useState([]);
@@ -8,11 +9,20 @@ const InventoryTable = () => {
   const [error, setError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [uploadData, setUploadData] = useState([]);
   const [uploadLoading, setUploadLoading] = useState(false);
+
+  // Selection state
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [currentEditItem, setCurrentEditItem] = useState(null);
+  const [bulkEditField, setBulkEditField] = useState("");
+  const [bulkEditValue, setBulkEditValue] = useState("");
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -94,7 +104,158 @@ const InventoryTable = () => {
     fetchInventory(); // Refresh the list
   };
 
-  // Handle file upload
+  // Selection handlers
+  const handleSelectItem = (itemId) => {
+    setSelectedItems(prev => {
+      if (prev.includes(itemId)) {
+        return prev.filter(id => id !== itemId);
+      } else {
+        return [...prev, itemId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(currentItems.map(item => item._id));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Clear selection when page changes
+  useEffect(() => {
+    setSelectedItems([]);
+    setSelectAll(false);
+  }, [currentPage, searchTerm]);
+
+  // Edit single item
+  const handleEditItem = (item) => {
+    setCurrentEditItem(item);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (updatedItem) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${API_BASE_URL}/api/inventories/${updatedItem._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedItem)
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update item");
+      }
+
+      await fetchInventory(); // Refresh the list
+      setShowEditModal(false);
+      setCurrentEditItem(null);
+
+    } catch (error) {
+      console.error("Edit error:", error);
+      setError("Failed to update item. Please try again.");
+    }
+  };
+
+  // Bulk edit
+  const handleBulkEdit = async () => {
+    if (!bulkEditField || selectedItems.length === 0) return;
+
+    try {
+      setUploadLoading(true);
+      const token = localStorage.getItem("token");
+
+      const updatePromises = selectedItems.map(itemId => {
+        const updateData = {};
+
+        switch (bulkEditField) {
+          case 'category':
+            updateData.category = bulkEditValue;
+            break;
+          case 'unit':
+            updateData.unit = bulkEditValue;
+            break;
+          case 'price':
+            updateData.unitPrice = parseFloat(bulkEditValue);
+            break;
+          case 'stock':
+            updateData.stock = parseInt(bulkEditValue);
+            break;
+          default:
+            break;
+        }
+
+        return fetch(`${API_BASE_URL}/api/inventories/${itemId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(updateData)
+        });
+      });
+
+      await Promise.all(updatePromises);
+
+      await fetchInventory(); // Refresh the list
+      setShowBulkEditModal(false);
+      setSelectedItems([]);
+      setBulkEditField("");
+      setBulkEditValue("");
+
+      alert(`Successfully updated ${selectedItems.length} items!`);
+
+    } catch (error) {
+      console.error("Bulk edit error:", error);
+      setError("Failed to update items. Please try again.");
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // Delete selected items
+  const handleDeleteSelected = async () => {
+    if (selectedItems.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedItems.length} selected items?`)) {
+      return;
+    }
+
+    try {
+      setUploadLoading(true);
+      const token = localStorage.getItem("token");
+
+      const deletePromises = selectedItems.map(itemId =>
+        fetch(`${API_BASE_URL}/api/inventories/${itemId}`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        })
+      );
+
+      await Promise.all(deletePromises);
+
+      await fetchInventory(); // Refresh the list
+      setSelectedItems([]);
+
+      alert(`Successfully deleted ${selectedItems.length} items!`);
+
+    } catch (error) {
+      console.error("Delete error:", error);
+      setError("Failed to delete items. Please try again.");
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // Handle file upload (existing code)
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -299,6 +460,26 @@ const InventoryTable = () => {
           <p className="text-sm text-gray-600 mt-1">Manage and track all supplies inventory</p>
         </div>
         <div className="flex gap-3">
+          {/* Selection Actions - Show when items are selected */}
+          {selectedItems.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowBulkEditModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
+              >
+                <span className="text-lg">✏️</span>
+                Edit Selected ({selectedItems.length})
+              </button>
+              <button
+                onClick={handleDeleteSelected}
+                className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
+              >
+                <span className="text-lg">🗑️</span>
+                Delete Selected
+              </button>
+            </>
+          )}
+
           {/* Upload Button */}
           <button
             onClick={() => document.getElementById('file-upload').click()}
@@ -344,6 +525,86 @@ const InventoryTable = () => {
         onClose={() => setShowAddModal(false)}
         onSupplyAdded={handleSupplyAdded}
       />
+
+      {/* Single Edit Modal */}
+      {showEditModal && currentEditItem && (
+        <EditInventoryModal
+          item={currentEditItem}
+          onClose={() => {
+            setShowEditModal(false);
+            setCurrentEditItem(null);
+          }}
+          onSave={handleSaveEdit}
+        />
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Bulk Edit Items</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Editing {selectedItems.length} selected items
+              </p>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Field to Edit</label>
+                  <select
+                    value={bulkEditField}
+                    onChange={(e) => setBulkEditField(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select field...</option>
+                    <option value="category">Category</option>
+                    <option value="unit">Unit</option>
+                    <option value="price">Unit Price</option>
+                    <option value="stock">Stock Quantity</option>
+                  </select>
+                </div>
+
+                {bulkEditField && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">New Value</label>
+                    <input
+                      type={bulkEditField === 'price' || bulkEditField === 'stock' ? 'number' : 'text'}
+                      value={bulkEditValue}
+                      onChange={(e) => setBulkEditValue(e.target.value)}
+                      placeholder={`Enter new ${bulkEditField}`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      step={bulkEditField === 'price' ? '0.01' : '1'}
+                      min="0"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowBulkEditModal(false);
+                  setBulkEditField("");
+                  setBulkEditValue("");
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkEdit}
+                disabled={!bulkEditField || !bulkEditValue || uploadLoading}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {uploadLoading ? 'Updating...' : 'Update All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Confirmation Modal */}
       {showUploadModal && (
@@ -429,7 +690,6 @@ const InventoryTable = () => {
         </div>
       )}
 
-      {/* Rest of your component remains the same... */}
       {/* Search and Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
@@ -447,6 +707,11 @@ const InventoryTable = () => {
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <span>Total Items:</span>
           <span className="font-semibold">{filteredInventory.length}</span>
+          {selectedItems.length > 0 && (
+            <span className="ml-4 text-purple-600">
+              {selectedItems.length} selected
+            </span>
+          )}
         </div>
       </div>
 
@@ -456,6 +721,14 @@ const InventoryTable = () => {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-6 py-4 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
@@ -463,12 +736,13 @@ const InventoryTable = () => {
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Value</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
                     {searchTerm ? "No items match your search" : "No inventory items found"}
                   </td>
                 </tr>
@@ -493,6 +767,14 @@ const InventoryTable = () => {
 
                   return (
                     <tr key={item._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(item._id)}
+                          onChange={() => handleSelectItem(item._id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-6 py-4 font-medium text-gray-900">{item.name || "—"}</td>
                       <td className="px-6 py-4 text-gray-600">{item.category || "—"}</td>
                       <td className="px-6 py-4 text-gray-600">{item.unit || "—"}</td>
@@ -507,6 +789,14 @@ const InventoryTable = () => {
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
                           {statusText}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => handleEditItem(item)}
+                          className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   );
