@@ -8,7 +8,8 @@ const generateToken = (user) => {
         {
             id: user._id,
             email: user.email,
-            role: user.role
+            role: user.role,
+            department: user.department
         },
         JWT_SECRET,
         { expiresIn: '24h' }

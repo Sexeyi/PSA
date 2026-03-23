@@ -14,8 +14,6 @@ const connectDB = async () => {
     }
 };
 
-
-
 module.exports = {
     PORT,
     MONGO_URI,
