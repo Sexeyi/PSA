@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 
-// Simple icon components without external dependencies
+// Simple icon components
 const IconClock = () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -20,7 +20,7 @@ const IconXCircle = () => (
 );
 
 const IconSearch = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
 );
@@ -46,12 +46,6 @@ const IconDownload = () => (
 const IconBell = () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-    </svg>
-);
-
-const IconUser = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
 );
 
@@ -117,7 +111,6 @@ export default function EmployeeDashboard() {
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [viewMode, setViewMode] = useState("list");
 
-    // FETCH FROM DATABASE
     const fetchRequisitions = useCallback(async () => {
         setLoading(true);
         try {
@@ -141,7 +134,6 @@ export default function EmployeeDashboard() {
         fetchRequisitions();
     }, [fetchRequisitions]);
 
-    // STATS with trends
     const stats = useMemo(() => {
         const now = new Date();
         const thisMonth = requisitions.filter(r => {
@@ -171,7 +163,6 @@ export default function EmployeeDashboard() {
         };
     }, [requisitions]);
 
-    // FILTERED, SORTED, AND SEARCHED
     const filtered = useMemo(() => {
         let result = requisitions;
 
@@ -186,7 +177,6 @@ export default function EmployeeDashboard() {
             );
         }
 
-        // Sorting
         result = [...result].sort((a, b) => {
             if (sortBy === "date") {
                 return sortOrder === "desc"
@@ -210,7 +200,6 @@ export default function EmployeeDashboard() {
         return result;
     }, [filter, requisitions, searchTerm, sortBy, sortOrder]);
 
-    // Notifications
     const notifications = useMemo(() => {
         const pendingRequisitions = requisitions.filter(r => r.status === "Pending");
         const urgentRequisitions = requisitions.filter(r => r.priority === "high" && r.status === "Pending");
@@ -242,7 +231,6 @@ export default function EmployeeDashboard() {
         ];
     }, [requisitions]);
 
-    // CALENDAR FUNCTIONS
     const getDaysInMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     const getFirstDay = (d) => new Date(d.getFullYear(), d.getMonth(), 1).getDay();
 
@@ -269,9 +257,9 @@ export default function EmployeeDashboard() {
             let dayClass = "text-center py-2 text-sm relative cursor-pointer hover:scale-105 transition-all duration-200";
 
             if (isToday) {
-                dayClass += " bg-[#023e8a] text-white hover:bg-[#023e8a]/90 font-semibold shadow-lg rounded-lg";
+                dayClass += " bg-primary-500 text-white hover:bg-primary-600 font-semibold shadow-lg rounded-lg";
             } else if (hasEvent) {
-                dayClass += " bg-[#023e8a]/10 text-[#023e8a] font-medium hover:bg-[#023e8a]/20 rounded-lg";
+                dayClass += " bg-primary-50 text-primary-700 font-medium hover:bg-primary-100 rounded-lg";
             } else {
                 dayClass += " hover:bg-gray-50 rounded-lg";
             }
@@ -280,7 +268,7 @@ export default function EmployeeDashboard() {
                 <div key={i} className={dayClass}>
                     {i}
                     {hasEvent && !isToday && (
-                        <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-[#023e8a] rounded-full animate-pulse" />
+                        <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
                     )}
                 </div>
             );
@@ -299,30 +287,30 @@ export default function EmployeeDashboard() {
     };
 
     const badgeClass = (status) => {
-        const baseClass = "px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center gap-1";
+        const baseClass = "badge";
         switch (status?.toLowerCase()) {
             case 'pending':
-                return `${baseClass} bg-yellow-100 text-yellow-800`;
+                return `${baseClass} badge-pending`;
             case 'approved':
-                return `${baseClass} bg-green-100 text-green-800`;
+                return `${baseClass} badge-approved`;
             case 'rejected':
-                return `${baseClass} bg-red-100 text-red-800`;
+                return `${baseClass} badge-rejected`;
             default:
-                return `${baseClass} bg-gray-100 text-gray-800`;
+                return `${baseClass}`;
         }
     };
 
     const priorityClass = (priority) => {
-        const baseClass = "px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center gap-1";
+        const baseClass = "badge";
         switch (priority?.toLowerCase()) {
             case 'high':
-                return `${baseClass} bg-red-100 text-red-800`;
+                return `${baseClass} priority-high`;
             case 'medium':
-                return `${baseClass} bg-yellow-100 text-yellow-800`;
+                return `${baseClass} priority-medium`;
             case 'low':
-                return `${baseClass} bg-green-100 text-green-800`;
+                return `${baseClass} priority-low`;
             default:
-                return `${baseClass} bg-gray-100 text-gray-800`;
+                return `${baseClass}`;
         }
     };
 
@@ -339,9 +327,9 @@ export default function EmployeeDashboard() {
 
     if (loading) {
         return (
-            <div className="fixed inset-0 flex items-center justify-center bg-linear-to-br from-gray-50 to-white">
+            <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-[#023e8a]/20 border-t-[#023e8a] rounded-full animate-spin mx-auto"></div>
+                    <div className="spinner-lg"></div>
                     <p className="mt-4 text-gray-600 font-medium">Loading dashboard...</p>
                     <p className="text-sm text-gray-400 mt-1">Fetching your latest requests</p>
                 </div>
@@ -357,7 +345,7 @@ export default function EmployeeDashboard() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                             <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-linear-to-br from-[#023e8a] to-[#023e8a]/80 rounded-lg flex items-center justify-center shadow-sm">
+                                <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center shadow-sm">
                                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                     </svg>
@@ -368,15 +356,14 @@ export default function EmployeeDashboard() {
                                 </div>
                             </div>
 
-                            {/* Quick Stats Badges */}
                             <div className="hidden md:flex items-center space-x-2 ml-4">
-                                <div className="px-2 py-1 bg-green-50 rounded-md border border-green-200">
-                                    <span className="text-xs font-medium text-green-700">
+                                <div className="px-2 py-1 bg-success-50 rounded-md border border-success-200">
+                                    <span className="text-xs font-medium text-success-700">
                                         {stats.approvalRate}% Approval Rate
                                     </span>
                                 </div>
-                                <div className="px-2 py-1 bg-[#023e8a]/10 rounded-md border border-[#023e8a]/20">
-                                    <span className="text-xs font-medium text-[#023e8a]">
+                                <div className="px-2 py-1 bg-primary-50 rounded-md border border-primary-200">
+                                    <span className="text-xs font-medium text-primary-700">
                                         Avg. {stats.averageProcessingTime}
                                     </span>
                                 </div>
@@ -384,31 +371,27 @@ export default function EmployeeDashboard() {
                         </div>
 
                         <div className="flex items-center space-x-3">
-                            {/* Last Updated */}
                             <div className="hidden sm:flex items-center space-x-1 text-xs text-gray-500">
                                 <IconClock />
                                 <span>Updated {formatDateTime(lastUpdated)}</span>
                             </div>
 
-                            {/* Refresh Button */}
                             <button
                                 onClick={fetchRequisitions}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative group"
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                                 title="Refresh data"
                             >
                                 <IconRefresh />
                             </button>
 
-                            {/* Export Button */}
                             <button
                                 onClick={handleExport}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative group"
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                                 title="Export data"
                             >
                                 <IconDownload />
                             </button>
 
-                            {/* Notifications */}
                             <div className="relative">
                                 <button
                                     onClick={() => setShowNotifications(!showNotifications)}
@@ -416,12 +399,12 @@ export default function EmployeeDashboard() {
                                 >
                                     <IconBell />
                                     {notifications.length > 0 && (
-                                        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                        <span className="absolute top-1 right-1 w-2 h-2 bg-danger-500 rounded-full animate-pulse"></span>
                                     )}
                                 </button>
 
                                 {showNotifications && (
-                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 animate-slide-up">
                                         <div className="p-3 border-b border-gray-200">
                                             <h3 className="font-semibold text-gray-900">Notifications</h3>
                                             <p className="text-xs text-gray-500 mt-1">{notifications.length} new updates</p>
@@ -430,8 +413,8 @@ export default function EmployeeDashboard() {
                                             {notifications.map(notification => (
                                                 <div key={notification.id} className="p-3 hover:bg-gray-50 border-b border-gray-100 cursor-pointer transition-colors">
                                                     <div className="flex items-start space-x-2">
-                                                        <div className={`w-2 h-2 mt-1.5 rounded-full ${notification.type === 'urgent' ? 'bg-red-500' :
-                                                            notification.type === 'approved' ? 'bg-green-500' : 'bg-yellow-500'
+                                                        <div className={`w-2 h-2 mt-1.5 rounded-full ${notification.type === 'urgent' ? 'bg-danger-500' :
+                                                                notification.type === 'approved' ? 'bg-success-500' : 'bg-warning-500'
                                                             }`} />
                                                         <div className="flex-1">
                                                             <p className="text-sm text-gray-700">{notification.message}</p>
@@ -451,57 +434,57 @@ export default function EmployeeDashboard() {
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto">
-                <div className="px-6 sm:px-8 lg:px-10 py-6">
+                <div className="container-custom py-6">
 
                     {/* KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-all duration-300">
+                        <div className="card p-5">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-500">Total Requests</span>
-                                <svg className="w-5 h-5 text-[#023e8a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                 </svg>
                             </div>
                             <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
                             <div className="flex items-center justify-between mt-2">
                                 <p className="text-xs text-gray-500">This month: +{stats.thisMonth}</p>
-                                <div className={`text-xs flex items-center gap-1 ${stats.thisMonth > stats.lastMonth ? 'text-green-600' : 'text-red-600'}`}>
+                                <div className={`text-xs flex items-center gap-1 ${stats.thisMonth > stats.lastMonth ? 'text-success-600' : 'text-danger-600'}`}>
                                     {stats.thisMonth > stats.lastMonth ? <IconTrendingUp /> : <IconTrendingDown />}
                                     {stats.lastMonth ? ((stats.thisMonth - stats.lastMonth) / stats.lastMonth * 100).toFixed(0) : 0}%
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-all duration-300">
+                        <div className="card p-5">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-500">Pending</span>
                                 <IconClock />
                             </div>
-                            <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-                            <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                                <div className="bg-yellow-500 h-1.5 rounded-full" style={{ width: `${stats.total ? (stats.pending / stats.total) * 100 : 0}%` }} />
+                            <p className="text-2xl font-bold text-warning-600">{stats.pending}</p>
+                            <div className="progress-bar mt-2">
+                                <div className="progress-bar-fill bg-warning-500" style={{ width: `${stats.total ? (stats.pending / stats.total) * 100 : 0}%` }} />
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-all duration-300">
+                        <div className="card p-5">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-500">Approved</span>
                                 <IconCheckCircle />
                             </div>
-                            <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
-                            <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                                <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${stats.total ? (stats.approved / stats.total) * 100 : 0}%` }} />
+                            <p className="text-2xl font-bold text-success-600">{stats.approved}</p>
+                            <div className="progress-bar mt-2">
+                                <div className="progress-bar-fill bg-success-500" style={{ width: `${stats.total ? (stats.approved / stats.total) * 100 : 0}%` }} />
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-all duration-300">
+                        <div className="card p-5">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-500">Rejected</span>
                                 <IconXCircle />
                             </div>
-                            <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
-                            <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                                <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${stats.total ? (stats.rejected / stats.total) * 100 : 0}%` }} />
+                            <p className="text-2xl font-bold text-danger-600">{stats.rejected}</p>
+                            <div className="progress-bar mt-2">
+                                <div className="progress-bar-fill bg-danger-500" style={{ width: `${stats.total ? (stats.rejected / stats.total) * 100 : 0}%` }} />
                             </div>
                         </div>
                     </div>
@@ -509,13 +492,12 @@ export default function EmployeeDashboard() {
                     {/* Main Content Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Requests Table */}
-                        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-150 overflow-hidden">
-                            {/* Table Header with Controls */}
-                            <div className="p-5 border-b border-gray-200 bg-linear-to-r from-gray-50 to-white shrink-0">
+                        <div className="lg:col-span-2 card flex flex-col h-[600px] overflow-hidden">
+                            <div className="p-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white shrink-0">
                                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                                     <div className="flex items-center space-x-3">
-                                        <div className="w-10 h-10 rounded-full bg-[#023e8a]/10 flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-[#023e8a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center">
+                                            <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                             </svg>
@@ -526,33 +508,31 @@ export default function EmployeeDashboard() {
                                         </div>
                                     </div>
 
-                                    {/* View Toggle */}
                                     <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
                                         <button
                                             onClick={() => setViewMode("list")}
-                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-[#023e8a]" : "text-gray-600 hover:bg-gray-200"}`}
+                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-primary-600" : "text-gray-600 hover:bg-gray-200"}`}
                                         >
                                             List
                                         </button>
                                         <button
                                             onClick={() => setViewMode("grid")}
-                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === "grid" ? "bg-white shadow-sm text-[#023e8a]" : "text-gray-600 hover:bg-gray-200"}`}
+                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === "grid" ? "bg-white shadow-sm text-primary-600" : "text-gray-600 hover:bg-gray-200"}`}
                                         >
                                             Grid
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Search and Filters */}
                                 <div className="flex flex-wrap gap-3">
-                                    <div className="flex-1 min-w-50 relative">
+                                    <div className="flex-1 min-w-[200px] relative">
                                         <IconSearch />
                                         <input
                                             type="text"
                                             placeholder="Search by title or ID..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#023e8a]/20 focus:border-[#023e8a] transition-all"
+                                            className="input pl-9"
                                         />
                                     </div>
 
@@ -560,7 +540,7 @@ export default function EmployeeDashboard() {
                                         <select
                                             value={sortBy}
                                             onChange={(e) => setSortBy(e.target.value)}
-                                            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#023e8a]/20 focus:border-[#023e8a] bg-white"
+                                            className="input w-auto"
                                         >
                                             <option value="date">Sort by Date</option>
                                             <option value="status">Sort by Status</option>
@@ -569,23 +549,19 @@ export default function EmployeeDashboard() {
 
                                         <button
                                             onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                                            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                            className="btn btn-secondary px-3"
                                         >
                                             {sortOrder === "desc" ? "↓" : "↑"}
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Filter Chips */}
                                 <div className="flex flex-wrap gap-2 mt-4">
                                     {["All", "Pending", "Approved", "Rejected"].map(s => (
                                         <button
                                             key={s}
                                             onClick={() => setFilter(s)}
-                                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${filter === s
-                                                ? "bg-[#023e8a] text-white shadow-sm"
-                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                }`}
+                                            className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-secondary'}`}
                                         >
                                             {s}
                                             {s !== "All" && (
@@ -598,47 +574,46 @@ export default function EmployeeDashboard() {
                                 </div>
                             </div>
 
-                            {/* Table Content */}
                             <div className="overflow-y-auto flex-1">
                                 {viewMode === "list" ? (
-                                    <table className="w-full">
-                                        <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                    <table className="table">
+                                        <thead className="sticky top-0">
                                             <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                                <th>ID</th>
+                                                <th>Title</th>
+                                                <th>Status</th>
+                                                <th>Priority</th>
+                                                <th>Created</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-200">
+                                        <tbody>
                                             {filtered.map((r) => (
                                                 <tr
                                                     key={r._id}
-                                                    className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                                    className="cursor-pointer"
                                                     onClick={() => setSelectedRequest(r)}
                                                 >
-                                                    <td className="px-6 py-3 whitespace-nowrap">
-                                                        <span className="text-sm font-mono text-[#023e8a] font-medium">
+                                                    <td>
+                                                        <span className="text-sm font-mono text-primary-600 font-medium">
                                                             {r.requestNumber || r._id?.slice(-6)}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3">
+                                                    <td>
                                                         <div className="text-sm font-medium text-gray-900">
                                                             {r.title || r.itemName}
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap">
+                                                    <td>
                                                         <span className={badgeClass(r.status)}>
                                                             {r.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap">
+                                                    <td>
                                                         <span className={priorityClass(r.priority)}>
                                                             {r.priority}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap">
+                                                    <td>
                                                         <span className="text-sm text-gray-500">{daysAgoLabel(r.createdAt)}</span>
                                                     </td>
                                                 </tr>
@@ -650,7 +625,7 @@ export default function EmployeeDashboard() {
                                         {filtered.map((r) => (
                                             <div
                                                 key={r._id}
-                                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer hover:border-[#023e8a]/30"
+                                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer hover:border-primary-200"
                                                 onClick={() => setSelectedRequest(r)}
                                             >
                                                 <div className="flex items-start justify-between mb-2">
@@ -682,22 +657,21 @@ export default function EmployeeDashboard() {
                                 )}
                             </div>
 
-                            {/* Table Footer */}
                             {filtered.length > 0 && (
                                 <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex justify-between items-center shrink-0">
                                     <span>Showing {filtered.length} of {requisitions.length} requests</span>
                                     <div className="flex items-center space-x-2">
-                                        <span className="text-[#023e8a] font-medium">{stats.approvalRate}%</span>
+                                        <span className="text-primary-600 font-medium">{stats.approvalRate}%</span>
                                         <span className="text-gray-400">approval rate</span>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Right Sidebar - Calendar & Insights */}
+                        {/* Right Sidebar */}
                         <div className="space-y-6">
                             {/* Calendar Card */}
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-all duration-300">
+                            <div className="card p-5">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center space-x-2">
                                         <IconCalendar />
@@ -727,7 +701,7 @@ export default function EmployeeDashboard() {
 
                                 <div className="grid grid-cols-7 gap-1">
                                     {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d, i) => (
-                                        <div key={i} className="text-center py-1 text-xs font-semibold text-[#023e8a]">
+                                        <div key={i} className="text-center py-1 text-xs font-semibold text-primary-600">
                                             {d}
                                         </div>
                                     ))}
@@ -735,8 +709,8 @@ export default function EmployeeDashboard() {
                                 </div>
 
                                 <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2 text-xs">
-                                    <div className="bg-[#023e8a]/10 rounded-lg p-2 text-center">
-                                        <p className="text-[#023e8a] font-semibold">
+                                    <div className="bg-primary-50 rounded-lg p-2 text-center">
+                                        <p className="text-primary-600 font-semibold">
                                             {requisitions.filter(r => {
                                                 const date = new Date(r.createdAt);
                                                 return date.getMonth() === calDate.getMonth() && date.getFullYear() === calDate.getFullYear();
@@ -744,20 +718,20 @@ export default function EmployeeDashboard() {
                                         </p>
                                         <p className="text-gray-500 text-xs">This month</p>
                                     </div>
-                                    <div className="bg-green-50 rounded-lg p-2 text-center">
-                                        <p className="text-green-600 font-semibold">{stats.approvalRate}%</p>
+                                    <div className="bg-success-50 rounded-lg p-2 text-center">
+                                        <p className="text-success-600 font-semibold">{stats.approvalRate}%</p>
                                         <p className="text-gray-500 text-xs">Approval rate</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Recent Activity Feed */}
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                            <div className="card p-5">
                                 <h3 className="font-semibold text-gray-900 mb-3">Recent Activity</h3>
                                 <div className="space-y-3">
                                     {filtered.slice(0, 5).map((r) => (
                                         <div key={r._id} className="flex items-start space-x-2 text-sm">
-                                            <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-[#023e8a]"></div>
+                                            <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-primary-500"></div>
                                             <div className="flex-1">
                                                 <p className="text-gray-700">{r.title || r.itemName}</p>
                                                 <p className="text-xs text-gray-400">{daysAgoLabel(r.createdAt)}</p>
@@ -776,8 +750,8 @@ export default function EmployeeDashboard() {
 
             {/* Request Details Modal */}
             {selectedRequest && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedRequest(null)}>
-                    <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" onClick={() => setSelectedRequest(null)}>
+                    <div className="modal-content max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
                         <div className="sticky top-0 bg-white border-b border-gray-200 p-5 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-gray-900">Request Details</h3>
                             <button onClick={() => setSelectedRequest(null)} className="text-gray-400 hover:text-gray-600">
@@ -819,7 +793,7 @@ export default function EmployeeDashboard() {
                             )}
                         </div>
                         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 flex justify-end">
-                            <button onClick={() => setSelectedRequest(null)} className="px-4 py-2 bg-[#023e8a] text-white rounded-lg hover:bg-[#023e8a]/90 transition-colors">
+                            <button onClick={() => setSelectedRequest(null)} className="btn btn-primary">
                                 Close
                             </button>
                         </div>

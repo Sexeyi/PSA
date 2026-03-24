@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-/* CSS Custom Properties (Variables) */
+/* ============================================
+   CSS CUSTOM PROPERTIES (VARIABLES)
+   ============================================ */
 :root {
   /* Primary Color - #023e8a */
   --primary-50: #e6f0fa;
@@ -94,7 +96,9 @@
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Base Styles */
+/* ============================================
+   BASE STYLES
+   ============================================ */
 * {
   margin: 0;
   padding: 0;
@@ -112,13 +116,15 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
-  background: linear-gradient(135deg, var(--gray-50) 0%, #ffffff 100%);
+  background: var(--gray-50);
   color: var(--gray-900);
   line-height: 1.5;
   overflow-x: hidden;
 }
 
-/* Typography */
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   line-height: 1.25;
@@ -132,20 +138,47 @@ h4 { font-size: 1.125rem; }
 h5 { font-size: 1rem; }
 h6 { font-size: 0.875rem; }
 
-/* Gradient Text Utility */
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
 .gradient-text {
-  background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-500) 100%);
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* Cards */
+.container-custom {
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .container-custom {
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-custom {
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
+  }
+}
+
+/* ============================================
+   CARDS
+   ============================================ */
 .card {
   background: white;
   border-radius: var(--radius-xl);
   border: 1px solid var(--gray-200);
   transition: all var(--transition-base) var(--ease-out);
+  overflow: hidden;
 }
 
 .card:hover {
@@ -153,7 +186,9 @@ h6 { font-size: 0.875rem; }
   transform: translateY(-2px);
 }
 
-/* Buttons */
+/* ============================================
+   BUTTONS
+   ============================================ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -170,18 +205,14 @@ h6 { font-size: 0.875rem; }
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-500) 100%);
+  background: var(--primary-500);
   color: white;
-  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover:not(:disabled) {
+  background: var(--primary-600);
   transform: translateY(-1px);
   box-shadow: var(--shadow-primary);
-}
-
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0);
 }
 
 .btn-secondary {
@@ -209,7 +240,9 @@ h6 { font-size: 0.875rem; }
   cursor: not-allowed;
 }
 
-/* Form Elements */
+/* ============================================
+   FORM ELEMENTS
+   ============================================ */
 .input,
 select,
 textarea {
@@ -236,11 +269,19 @@ textarea:hover:not(:disabled) {
   border-color: var(--gray-400);
 }
 
-/* Badges */
+.input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--gray-100);
+  cursor: not-allowed;
+}
+
+/* ============================================
+   BADGES
+   ============================================ */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   font-size: 0.75rem;
   font-weight: 500;
@@ -284,7 +325,9 @@ textarea:hover:not(:disabled) {
   color: var(--success-800);
 }
 
-/* Tables */
+/* ============================================
+   TABLES
+   ============================================ */
 .table-wrapper {
   overflow-x: auto;
   border-radius: var(--radius-lg);
@@ -321,9 +364,12 @@ textarea:hover:not(:disabled) {
 
 .table tbody tr:hover {
   background: var(--gray-50);
+  cursor: pointer;
 }
 
-/* Animations */
+/* ============================================
+   ANIMATIONS
+   ============================================ */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -332,15 +378,6 @@ textarea:hover:not(:disabled) {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
   }
 }
 
@@ -373,6 +410,15 @@ textarea:hover:not(:disabled) {
   }
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.3s var(--ease-out) forwards;
 }
@@ -389,7 +435,9 @@ textarea:hover:not(:disabled) {
   animation: pulse 2s var(--ease-in-out) infinite;
 }
 
-/* Loading Spinner */
+/* ============================================
+   LOADING SPINNER
+   ============================================ */
 .spinner {
   width: 2rem;
   height: 2rem;
@@ -411,7 +459,25 @@ textarea:hover:not(:disabled) {
   border-width: 4px;
 }
 
-/* Modals */
+/* ============================================
+   SKELETON LOADING
+   ============================================ */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--gray-200) 0%,
+    var(--gray-300) 20%,
+    var(--gray-200) 40%,
+    var(--gray-200) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+  border-radius: var(--radius-md);
+}
+
+/* ============================================
+   MODALS
+   ============================================ */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -433,7 +499,9 @@ textarea:hover:not(:disabled) {
   animation: slideUp 0.3s var(--ease-out);
 }
 
-/* Tooltips */
+/* ============================================
+   TOOLTIPS
+   ============================================ */
 .tooltip {
   position: relative;
   display: inline-block;
@@ -462,7 +530,9 @@ textarea:hover:not(:disabled) {
   opacity: 1;
 }
 
-/* Progress Bar */
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
 .progress-bar {
   width: 100%;
   height: 0.5rem;
@@ -473,12 +543,14 @@ textarea:hover:not(:disabled) {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-500), var(--primary-600));
+  background: var(--primary-500);
   border-radius: 9999px;
   transition: width 0.3s var(--ease-out);
 }
 
-/* Scrollbar */
+/* ============================================
+   SCROLLBAR
+   ============================================ */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -498,20 +570,26 @@ textarea:hover:not(:disabled) {
   background: var(--gray-500);
 }
 
-/* Selection */
+/* ============================================
+   SELECTION
+   ============================================ */
 ::selection {
   background: var(--primary-500);
   color: white;
 }
 
-/* Focus Ring */
-.focus-ring:focus-visible {
-  outline: none;
-  ring: 2px solid var(--primary-500);
-  ring-offset: 2px;
+/* ============================================
+   FOCUS RING
+   ============================================ */
+:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
-/* Responsive */
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
 @media (max-width: 768px) {
   html {
     font-size: 14px;
@@ -525,9 +603,16 @@ textarea:hover:not(:disabled) {
   .table td {
     padding: var(--space-3) var(--space-4);
   }
+  
+  .modal-content {
+    width: 95vw;
+    max-height: 95vh;
+  }
 }
 
-/* Dark Mode */
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
 @media (prefers-color-scheme: dark) {
   :root {
     --gray-50: #111827;
@@ -543,11 +628,12 @@ textarea:hover:not(:disabled) {
   }
   
   body {
-    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-900) 100%);
+    background: var(--gray-50);
   }
   
   .card {
     background: var(--gray-800);
+    border-color: var(--gray-700);
   }
   
   .input,
@@ -557,9 +643,91 @@ textarea:hover:not(:disabled) {
     border-color: var(--gray-600);
     color: var(--gray-100);
   }
+  
+  .input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--primary-500);
+  }
+  
+  .table thead {
+    background: var(--gray-800);
+    border-color: var(--gray-700);
+  }
+  
+  .table td {
+    border-color: var(--gray-700);
+  }
+  
+  .table tbody tr:hover {
+    background: var(--gray-700);
+  }
+  
+  .btn-secondary {
+    background: var(--gray-700);
+    border-color: var(--gray-600);
+    color: var(--primary-400);
+  }
+  
+  .btn-secondary:hover {
+    background: var(--gray-600);
+  }
+  
+  .modal-content {
+    background: var(--gray-800);
+  }
+  
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--gray-700) 0%,
+      var(--gray-600) 20%,
+      var(--gray-700) 40%,
+      var(--gray-700) 100%
+    );
+  }
 }
 
-/* Utility Classes */
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid var(--gray-300);
+  }
+  
+  body {
+    background: white;
+  }
+  
+  .btn,
+  button {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY - REDUCED MOTION
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
 .text-truncate {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -573,25 +741,93 @@ textarea:hover:not(:disabled) {
   overflow: hidden;
 }
 
-/* Custom Container */
-.container-custom {
-  max-width: 1280px;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: var(--space-4);
-  padding-right: var(--space-4);
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-@media (min-width: 640px) {
-  .container-custom {
-    padding-left: var(--space-6);
-    padding-right: var(--space-6);
-  }
+/* ============================================
+   STATUS DOTS
+   ============================================ */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: var(--space-2);
 }
 
-@media (min-width: 1024px) {
-  .container-custom {
-    padding-left: var(--space-8);
-    padding-right: var(--space-8);
-  }
+.status-dot.active {
+  background: var(--success-500);
+}
+
+.status-dot.pending {
+  background: var(--warning-500);
+}
+
+.status-dot.inactive {
+  background: var(--danger-500);
+}
+
+/* ============================================
+   DIVIDERS
+   ============================================ */
+.divider {
+  height: 1px;
+  background: var(--gray-200);
+  margin: var(--space-4) 0;
+}
+
+.divider-vertical {
+  width: 1px;
+  height: auto;
+  background: var(--gray-200);
+  margin: 0 var(--space-4);
+}
+
+/* ============================================
+   GRID LAYOUT HELPERS
+   ============================================ */
+.grid-cols-auto {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* ============================================
+   FLEX HELPERS
+   ============================================ */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ============================================
+   BORDER RADIUS UTILITIES
+   ============================================ */
+.rounded-full {
+  border-radius: 9999px;
+}
+
+/* ============================================
+   SHADOW UTILITIES
+   ============================================ */
+.shadow-hover {
+  transition: box-shadow var(--transition-base);
+}
+
+.shadow-hover:hover {
+  box-shadow: var(--shadow-lg);
 }
