@@ -16,6 +16,7 @@ const RequestApproval = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
+    const [filterStatus, setFilterStatus] = useState('pending');
     const [stats, setStats] = useState({
         pending: 0,
         approved: 0,
@@ -36,10 +37,6 @@ const RequestApproval = () => {
 
         try {
             const parsedUser = JSON.parse(userData);
-            console.log('👤 Logged in user:', parsedUser);
-            console.log('👤 User role:', parsedUser.role);
-
-            // Check if user is SuperAdmin (case insensitive)
             const userRole = parsedUser.role?.toLowerCase();
             if (userRole !== 'superadmin') {
                 alert(`Access denied. SuperAdmin only. Your role: ${parsedUser.role}`);
@@ -53,13 +50,18 @@ const RequestApproval = () => {
         }
     }, [navigate]);
 
-    // Fetch all requisitions for SuperAdmin
+    const extractId = (id) => {
+        if (!id) return null;
+        if (typeof id === 'string') return id;
+        if (typeof id === 'object' && id._id) return id._id;
+        if (typeof id === 'object' && id.id) return id.id;
+        return null;
+    };
+
     const fetchRequisitions = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-
-            console.log('Fetching requisitions with token:', token ? 'Token exists' : 'No token');
 
             const response = await fetch(`${API_BASE_URL}/api/requisitions`, {
                 headers: {
@@ -73,9 +75,7 @@ const RequestApproval = () => {
             }
 
             const data = await response.json();
-            console.log('Requisitions response:', data);
 
-            // Handle different response structures
             let requisitionsArray = [];
             if (data.data && Array.isArray(data.data)) {
                 requisitionsArray = data.data;
@@ -85,13 +85,64 @@ const RequestApproval = () => {
                 requisitionsArray = data;
             }
 
-            setRequisitions(requisitionsArray);
+            const processedRequisitions = requisitionsArray.map(req => {
+                let requesterId = null;
+                let requesterName = req.requesterName || req.requester?.name || null;
+                let requesterDepartment = req.department || req.requester?.department || null;
 
-            // Calculate stats
-            const pending = requisitionsArray.filter(req => req.status?.toLowerCase() === 'pending').length;
-            const approved = requisitionsArray.filter(req => req.status?.toLowerCase() === 'approved').length;
-            const rejected = requisitionsArray.filter(req => req.status?.toLowerCase() === 'rejected').length;
-            const issued = requisitionsArray.filter(req => req.status?.toLowerCase() === 'issued').length;
+                if (req.requesterId) {
+                    requesterId = extractId(req.requesterId);
+                } else if (req.requester && req.requester._id) {
+                    requesterId = req.requester._id;
+                    requesterName = req.requester.name || requesterName;
+                    requesterDepartment = req.requester.department || requesterDepartment;
+                } else if (req.userId) {
+                    requesterId = extractId(req.userId);
+                }
+
+                return {
+                    ...req,
+                    requesterId: requesterId,
+                    requesterName: requesterName,
+                    department: req.department || requesterDepartment
+                };
+            });
+
+            const requisitionsWithEmployeeIds = await Promise.all(
+                processedRequisitions.map(async (req) => {
+                    if (req.requesterId && req.requesterId !== 'N/A') {
+                        try {
+                            const employeeResponse = await fetch(`${API_BASE_URL}/api/users/${req.requesterId}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+
+                            if (employeeResponse.ok) {
+                                const employeeData = await employeeResponse.json();
+                                return {
+                                    ...req,
+                                    employeeId: employeeData.employeeId,
+                                    employeeName: employeeData.fullName,
+                                    employeeDepartment: employeeData.department,
+                                    employeeData: employeeData
+                                };
+                            }
+                        } catch (err) {
+                            console.error(`Error fetching employee for ${req.requesterId}:`, err);
+                        }
+                    }
+                    return req;
+                })
+            );
+
+            setRequisitions(requisitionsWithEmployeeIds);
+
+            const pending = requisitionsWithEmployeeIds.filter(req => req.status?.toLowerCase() === 'pending').length;
+            const approved = requisitionsWithEmployeeIds.filter(req => req.status?.toLowerCase() === 'approved').length;
+            const rejected = requisitionsWithEmployeeIds.filter(req => req.status?.toLowerCase() === 'rejected').length;
+            const issued = requisitionsWithEmployeeIds.filter(req => req.status?.toLowerCase() === 'issued').length;
 
             setStats({ pending, approved, rejected, issued });
             setError(null);
@@ -107,7 +158,6 @@ const RequestApproval = () => {
         fetchRequisitions();
     }, []);
 
-    // Handle approve by SuperAdmin
     const handleApprove = async () => {
         if (!selectedRequest) return;
 
@@ -115,11 +165,6 @@ const RequestApproval = () => {
             setProcessingId(selectedRequest._id);
             const token = localStorage.getItem('token');
 
-            console.log('Approving requisition:', selectedRequest._id);
-            console.log('User role:', user?.role);
-            console.log('Request payload:', { remarks });
-
-            // Use the approve endpoint
             const response = await fetch(`${API_BASE_URL}/api/requisitions/${selectedRequest._id}/approve`, {
                 method: 'PUT',
                 headers: {
@@ -127,32 +172,25 @@ const RequestApproval = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    remarks: remarks
+                    remarks: remarks,
+                    approvedBy: user?._id,
+                    approvedAt: new Date().toISOString()
                 })
             });
 
-            console.log('Approve response status:', response.status);
-
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                console.error('Approve error response:', errorData);
                 throw new Error(errorData.message || 'Failed to approve requisition');
             }
 
-            const result = await response.json();
-            console.log('Approve success response:', result);
-
-            // Refresh the list
             await fetchRequisitions();
 
-            // Close modals
             setShowApproveModal(false);
             setShowDetailsModal(false);
             setSelectedRequest(null);
             setRemarks('');
 
-            // Show success message
-            alert('Requisition approved successfully! It will now be available for Admin to issue.');
+            alert('✅ Requisition approved successfully! It is now ready for Admin to issue.');
         } catch (error) {
             console.error('Error approving requisition:', error);
             alert(error.message);
@@ -161,7 +199,6 @@ const RequestApproval = () => {
         }
     };
 
-    // Handle reject by SuperAdmin
     const handleReject = async () => {
         if (!selectedRequest) return;
 
@@ -169,11 +206,6 @@ const RequestApproval = () => {
             setProcessingId(selectedRequest._id);
             const token = localStorage.getItem('token');
 
-            console.log('Rejecting requisition:', selectedRequest._id);
-            console.log('User role:', user?.role);
-            console.log('Request payload:', { remarks });
-
-            // Use the reject endpoint
             const response = await fetch(`${API_BASE_URL}/api/requisitions/${selectedRequest._id}/reject`, {
                 method: 'PUT',
                 headers: {
@@ -181,32 +213,25 @@ const RequestApproval = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    remarks: remarks
+                    remarks: remarks,
+                    rejectedBy: user?._id,
+                    rejectedAt: new Date().toISOString()
                 })
             });
 
-            console.log('Reject response status:', response.status);
-
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                console.error('Reject error response:', errorData);
                 throw new Error(errorData.message || 'Failed to reject requisition');
             }
 
-            const result = await response.json();
-            console.log('Reject success response:', result);
-
-            // Refresh the list
             await fetchRequisitions();
 
-            // Close modals
             setShowRejectModal(false);
             setShowDetailsModal(false);
             setSelectedRequest(null);
             setRemarks('');
 
-            // Show success message
-            alert('Requisition rejected successfully!');
+            alert('❌ Requisition rejected successfully!');
         } catch (error) {
             console.error('Error rejecting requisition:', error);
             alert(error.message);
@@ -215,31 +240,35 @@ const RequestApproval = () => {
         }
     };
 
-    // Get only pending requisitions for the main table
-    const pendingRequisitions = requisitions.filter(req =>
-        req.status?.toLowerCase() === 'pending'
-    );
+    const getEmployeeDisplayId = (requisition) => {
+        if (requisition.employeeId) {
+            return requisition.employeeId;
+        }
+        if (requisition.employeeData?.employeeId) {
+            return requisition.employeeData.employeeId;
+        }
+        if (requisition.requesterId && typeof requisition.requesterId === 'string') {
+            return requisition.requesterId;
+        }
+        return 'N/A';
+    };
 
-    // Filter and search within pending requests
-    const filteredRequisitions = pendingRequisitions.filter(req => {
-        if (!searchTerm) return true;
+    const filteredRequisitions = requisitions.filter(req => {
+        const matchesStatus = filterStatus === 'all' || req.status?.toLowerCase() === filterStatus.toLowerCase();
+        const matchesSearch = !searchTerm ||
+            req.requesterName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            req.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            req.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            req.items?.some(item => item.itemName?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        const searchLower = searchTerm.toLowerCase();
-        return (
-            req.requesterName?.toLowerCase().includes(searchLower) ||
-            req.department?.toLowerCase().includes(searchLower) ||
-            req.notes?.toLowerCase().includes(searchLower) ||
-            req.items?.some(item => item.itemName?.toLowerCase().includes(searchLower))
-        );
+        return matchesStatus && matchesSearch;
     });
 
-    // Pagination
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = filteredRequisitions.slice(indexOfFirstItem, indexOfLastItem);
     const totalPages = Math.ceil(filteredRequisitions.length / itemsPerPage);
 
-    // Format date
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         try {
@@ -255,242 +284,295 @@ const RequestApproval = () => {
         }
     };
 
-    // Get priority badge based on quantity
-    const getPriorityBadge = (items) => {
-        const totalItems = items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-
-        if (totalItems > 20) {
-            return <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded-full text-xs font-medium">High</span>;
-        } else if (totalItems > 10) {
-            return <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Medium</span>;
-        }
-        return <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">Low</span>;
-    };
-
-    // Get status badge
     const getStatusBadge = (status) => {
         const statusLower = status?.toLowerCase() || '';
 
-        const statusConfig = {
-            'pending': 'bg-yellow-100 text-yellow-800',
-            'approved': 'bg-blue-100 text-blue-800',
-            'rejected': 'bg-red-100 text-red-800',
-            'issued': 'bg-green-100 text-green-800'
-        };
-
-        const colorClass = statusConfig[statusLower] || 'bg-gray-100 text-gray-800';
-
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
-                {status || 'Unknown'}
-            </span>
-        );
+        switch (statusLower) {
+            case 'pending':
+                return <span className="badge badge-pending">Pending</span>;
+            case 'approved':
+                return <span className="badge badge-approved">Approved</span>;
+            case 'rejected':
+                return <span className="badge badge-rejected">Rejected</span>;
+            case 'issued':
+                return <span className="badge badge-issued">Issued</span>;
+            default:
+                return <span className="badge">{status}</span>;
+        }
     };
 
     if (loading && requisitions.length === 0) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="min-h-screen bg-linear-to-br from-gray-50 to-white flex items-center justify-center">
                 <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-600 mb-4"></div>
-                    <p className="text-gray-600">Loading requisitions...</p>
+                    <div className="spinner-lg"></div>
+                    <p className="mt-4 text-gray-600 font-medium">Loading requisitions...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">SuperAdmin - Request Approval</h1>
-                <p className="text-gray-600 mt-1">
-                    Review and approve pending requisitions. Approved requests will be queued for Admin to issue.
-                </p>
-                {user && (
-                    <p className="text-sm text-gray-500 mt-2">
-                        Logged in as: {user.fullName} (Role: {user.role})
+        <div className="min-h-screen bg-linear-to-br from-gray-50 to-white">
+            <div className="container-custom py-8">
+                {/* Header */}
+                <div className="mb-8 animate-fade-in">
+                    <h1 className="gradient-text">SuperAdmin - Request Approval</h1>
+                    <p className="text-gray-600 mt-2">
+                        Review and approve pending requisitions. Approved requests will be queued for Admin to issue.
                     </p>
-                )}
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-600 mb-1">Pending</p>
-                    <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-600 mb-1">Approved</p>
-                    <p className="text-2xl font-bold text-blue-600">{stats.approved}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-600 mb-1">Rejected</p>
-                    <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-600 mb-1">Issued</p>
-                    <p className="text-2xl font-bold text-green-600">{stats.issued}</p>
-                </div>
-            </div>
-
-            {/* Search */}
-            <div className="mb-6">
-                <input
-                    type="text"
-                    placeholder="Search pending requests by requester, department, or item..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setCurrentPage(1);
-                    }}
-                    className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-                />
-            </div>
-
-            {/* Error Message */}
-            {error && (
-                <div className="mb-6 bg-red-50 text-red-800 p-4 rounded-lg border border-red-200">
-                    ⚠️ {error}
-                </div>
-            )}
-
-            {/* No Pending Requests Message */}
-            {pendingRequisitions.length === 0 && !loading && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-                    <div className="text-6xl mb-4">✅</div>
-                    <h3 className="text-xl font-medium text-gray-900 mb-2">No Pending Requests</h3>
-                    <p className="text-gray-600">
-                        All requisitions have been processed. Check back later for new requests.
-                    </p>
-                </div>
-            )}
-
-            {/* Pending Requisitions Table */}
-            {pendingRequisitions.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                        <h2 className="font-semibold text-gray-900">Pending Requisitions ({pendingRequisitions.length})</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Requester</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Items</th>
-                                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Qty</th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Priority</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date Requested</th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {currentItems.map(req => {
-                                    const totalQuantity = req.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-
-                                    return (
-                                        <tr
-                                            key={req._id}
-                                            className="hover:bg-gray-50 transition-colors cursor-pointer"
-                                            onClick={() => {
-                                                setSelectedRequest(req);
-                                                setShowDetailsModal(true);
-                                            }}
-                                        >
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium text-gray-900">
-                                                    {req.requesterName || 'Unknown'}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-600">
-                                                {req.department || 'N/A'}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-gray-900">{req.items?.length || 0} item(s)</div>
-                                                <div className="text-xs text-gray-500 truncate max-w-xs">
-                                                    {req.items?.map(i => i.itemName).join(', ')}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-medium text-gray-900">
-                                                {totalQuantity}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {getPriorityBadge(req.items)}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-600">
-                                                {formatDate(req.dateRequested)}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedRequest(req);
-                                                            setShowApproveModal(true);
-                                                        }}
-                                                        className="px-3 py-1 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                                                        disabled={processingId === req._id}
-                                                    >
-                                                        {processingId === req._id ? 'Processing...' : 'Approve'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedRequest(req);
-                                                            setShowRejectModal(true);
-                                                        }}
-                                                        className="px-3 py-1 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
-                                                        disabled={processingId === req._id}
-                                                    >
-                                                        Reject
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {filteredRequisitions.length > 0 && (
-                        <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <div className="text-sm text-gray-600">
-                                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredRequisitions.length)} of {filteredRequisitions.length} pending requisitions
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                                >
-                                    Previous
-                                </button>
-                                <span className="px-3 py-1 text-sm">
-                                    Page {currentPage} of {totalPages}
-                                </span>
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                                >
-                                    Next
-                                </button>
-                            </div>
+                    {user && (
+                        <div className="mt-3 flex items-center gap-2 text-sm text-gray-500 bg-white px-3 py-1 rounded-lg border border-gray-200">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <span>Logged in as: <strong>{user.fullName}</strong> (Role: {user.role})</span>
                         </div>
                     )}
                 </div>
-            )}
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                    <div className="card p-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-gray-500 mb-1">Pending</p>
+                                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                            </div>
+                            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                <span className="text-xl">⏳</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="card p-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-gray-500 mb-1">Approved</p>
+                                <p className="text-2xl font-bold text-blue-600">{stats.approved}</p>
+                            </div>
+                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <span className="text-xl">✅</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="card p-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-gray-500 mb-1">Rejected</p>
+                                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+                            </div>
+                            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                <span className="text-xl">❌</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="card p-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-gray-500 mb-1">Issued</p>
+                                <p className="text-2xl font-bold text-green-600">{stats.issued}</p>
+                            </div>
+                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                <span className="text-xl">📦</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Filters and Search */}
+                <div className="card p-5 mb-6">
+                    <div className="flex flex-wrap gap-4">
+                        <div className="flex-1 min-w-50">
+                            <div className="relative">
+                                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Search by requester, department, or item..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="input pl-10"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            {['pending', 'approved', 'rejected', 'issued', 'all'].map(status => (
+                                <button
+                                    key={status}
+                                    onClick={() => {
+                                        setFilterStatus(status);
+                                        setCurrentPage(1);
+                                    }}
+                                    className={`btn ${filterStatus === status ? 'btn-primary' : 'btn-secondary'}`}
+                                >
+                                    {status === 'all' ? 'All' : status}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                    <div className="mb-6 bg-red-50 text-red-800 p-4 rounded-lg border border-red-200">
+                        ⚠️ {error}
+                    </div>
+                )}
+
+                {/* Requisitions Table */}
+                <div className="card overflow-hidden">
+                    <div className="px-6 py-4 bg-linear-to-r from-gray-50 to-white border-b border-gray-200">
+                        <h2 className="font-semibold text-gray-900">
+                            Requisitions ({filteredRequisitions.length})
+                        </h2>
+                    </div>
+
+                    {filteredRequisitions.length === 0 ? (
+                        <div className="p-12 text-center">
+                            <div className="text-5xl mb-4">📭</div>
+                            <h3 className="text-xl font-medium text-gray-900 mb-2">No Requisitions Found</h3>
+                            <p className="text-gray-600">
+                                {searchTerm ? 'Try adjusting your search or filters' : 'No requisitions match the selected status'}
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="table-wrapper">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Requester</th>
+                                            <th>Department</th>
+                                            <th>Items</th>
+                                            <th className="text-right">Total Qty</th>
+                                            <th className="text-center">Status</th>
+                                            <th>Date</th>
+                                            <th className="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {currentItems.map(req => {
+                                            const totalQuantity = req.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+                                            const isPending = req.status?.toLowerCase() === 'pending';
+                                            const employeeDisplayId = getEmployeeDisplayId(req);
+
+                                            return (
+                                                <tr
+                                                    key={req._id}
+                                                    className="cursor-pointer hover:bg-gray-50 transition-colors"
+                                                    onClick={() => {
+                                                        setSelectedRequest(req);
+                                                        setShowDetailsModal(true);
+                                                    }}
+                                                >
+                                                    <td>
+                                                        <div className="font-medium text-gray-900">
+                                                            {req.requesterName || req.requester?.name || 'Unknown'}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Employee ID: {employeeDisplayId}
+                                                        </div>
+                                                    </td>
+                                                    <td className="text-gray-600">
+                                                        {req.department || 'N/A'}
+                                                    </td>
+                                                    <td>
+                                                        <div className="font-medium text-gray-900">{req.items?.length || 0} item(s)</div>
+                                                        <div className="text-xs text-gray-500 truncate max-w-xs mt-0.5">
+                                                            {req.items?.map(i => i.itemName).slice(0, 2).join(', ')}
+                                                            {req.items?.length > 2 && '...'}
+                                                        </div>
+                                                    </td>
+                                                    <td className="text-right font-medium text-gray-900">
+                                                        {totalQuantity}
+                                                    </td>
+                                                    <td className="text-center">
+                                                        {getStatusBadge(req.status)}
+                                                    </td>
+                                                    <td className="text-sm text-gray-600">
+                                                        {formatDate(req.createdAt || req.dateRequested)}
+                                                    </td>
+                                                    <td className="text-center">
+                                                        {isPending && (
+                                                            <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedRequest(req);
+                                                                        setShowApproveModal(true);
+                                                                    }}
+                                                                    className="btn btn-primary"
+                                                                    disabled={processingId === req._id}
+                                                                >
+                                                                    Approve
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedRequest(req);
+                                                                        setShowRejectModal(true);
+                                                                    }}
+                                                                    className="btn btn-danger"
+                                                                    disabled={processingId === req._id}
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {!isPending && (
+                                                            <span className="text-xs text-gray-400">Processed</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                                    <div className="text-sm text-gray-600">
+                                        Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredRequisitions.length)} of {filteredRequisitions.length} requisitions
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                            disabled={currentPage === 1}
+                                            className="btn btn-secondary"
+                                        >
+                                            Previous
+                                        </button>
+                                        <span className="px-3 py-1 text-sm">
+                                            Page {currentPage} of {totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                            disabled={currentPage === totalPages}
+                                            className="btn btn-secondary"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
 
             {/* Details Modal */}
             {showDetailsModal && selectedRequest && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>
-                    <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <div className="p-6 border-b border-gray-200 sticky top-0 bg-white">
-                            <div className="flex justify-between items-center">
+                <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+                    <div className="modal-content max-w-3xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 p-6">
+                            <div className="flex justify-between items-start">
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900">Requisition Details</h2>
-                                    <p className="text-sm text-gray-500 mt-1">Requested by: {selectedRequest.requesterName}</p>
-                                    <div className="mt-2">
+                                    <div className="flex items-center gap-2 mt-2">
                                         {getStatusBadge(selectedRequest.status)}
                                     </div>
                                 </div>
@@ -505,24 +587,24 @@ const RequestApproval = () => {
 
                         <div className="p-6 space-y-6">
                             {/* Requester Info */}
-                            <div className="bg-gray-50 p-4 rounded-lg">
+                            <div className="bg-gray-50 rounded-lg p-4">
                                 <h3 className="font-medium text-gray-900 mb-3">Requester Information</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-xs text-gray-500">Name</p>
-                                        <p className="font-medium">{selectedRequest.requesterName}</p>
+                                        <p className="font-medium">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">Employee ID</p>
+                                        <p className="font-medium">{getEmployeeDisplayId(selectedRequest)}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Department</p>
-                                        <p className="font-medium">{selectedRequest.department}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Requester ID</p>
-                                        <p className="font-medium">{selectedRequest.requesterId}</p>
+                                        <p className="font-medium">{selectedRequest.department || 'N/A'}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Date Requested</p>
-                                        <p className="font-medium">{formatDate(selectedRequest.dateRequested)}</p>
+                                        <p className="font-medium">{formatDate(selectedRequest.createdAt || selectedRequest.dateRequested)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -540,31 +622,43 @@ const RequestApproval = () => {
                             {/* Items */}
                             <div>
                                 <h3 className="font-medium text-gray-900 mb-3">Requested Items</h3>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-gray-50">
+                                <div className="table-wrapper">
+                                    <table className="table">
+                                        <thead>
                                             <tr>
-                                                <th className="px-4 py-2 text-left">Item Name</th>
-                                                <th className="px-4 py-2 text-left">Category</th>
-                                                <th className="px-4 py-2 text-left">Unit</th>
-                                                <th className="px-4 py-2 text-right">Quantity</th>
+                                                <th>Item Name</th>
+                                                <th>Category</th>
+                                                <th>Unit</th>
+                                                <th className="text-right">Quantity</th>
+                                                <th className="text-right">Unit Price</th>
+                                                <th className="text-right">Total</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y">
+                                        <tbody>
                                             {selectedRequest.items?.map((item, idx) => (
                                                 <tr key={idx}>
-                                                    <td className="px-4 py-2">{item.itemName}</td>
-                                                    <td className="px-4 py-2">{item.category || '—'}</td>
-                                                    <td className="px-4 py-2">{item.unit || '—'}</td>
-                                                    <td className="px-4 py-2 text-right font-medium">{item.quantity}</td>
+                                                    <td>{item.itemName}</td>
+                                                    <td>{item.category || '—'}</td>
+                                                    <td>{item.unit || '—'}</td>
+                                                    <td className="text-right font-medium">{item.quantity}</td>
+                                                    <td className="text-right">
+                                                        {item.unitPrice ? `$${item.unitPrice.toFixed(2)}` : '—'}
+                                                    </td>
+                                                    <td className="text-right font-semibold text-primary-600">
+                                                        {item.totalPrice ? `$${item.totalPrice.toFixed(2)}` : '—'}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
-                                        <tfoot className="bg-gray-50 font-medium">
-                                            <tr>
-                                                <td colSpan="3" className="px-4 py-2 text-right">Total Items:</td>
-                                                <td className="px-4 py-2 text-right">
+                                        <tfoot>
+                                            <tr className="bg-gray-50 font-medium">
+                                                <td colSpan="3" className="text-right">Totals:</td>
+                                                <td className="text-right">
                                                     {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                                                </td>
+                                                <td className="text-right">—</td>
+                                                <td className="text-right font-bold text-primary-600">
+                                                    ${selectedRequest.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2) || '0.00'}
                                                 </td>
                                             </tr>
                                         </tfoot>
@@ -572,7 +666,7 @@ const RequestApproval = () => {
                                 </div>
                             </div>
 
-                            {/* Actions - Only show if still pending */}
+                            {/* Actions */}
                             {selectedRequest.status?.toLowerCase() === 'pending' && (
                                 <div className="flex justify-end gap-3 pt-4 border-t">
                                     <button
@@ -580,7 +674,7 @@ const RequestApproval = () => {
                                             setShowDetailsModal(false);
                                             setShowRejectModal(true);
                                         }}
-                                        className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
+                                        className="btn btn-danger"
                                     >
                                         Reject
                                     </button>
@@ -589,7 +683,7 @@ const RequestApproval = () => {
                                             setShowDetailsModal(false);
                                             setShowApproveModal(true);
                                         }}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                        className="btn btn-primary"
                                     >
                                         Approve
                                     </button>
@@ -602,24 +696,35 @@ const RequestApproval = () => {
 
             {/* Approve Modal */}
             {showApproveModal && selectedRequest && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowApproveModal(false)}>
-                    <div className="bg-white rounded-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" onClick={() => setShowApproveModal(false)}>
+                    <div className="modal-content max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
                         <div className="p-6">
-                            <h2 className="text-xl font-bold text-gray-900 mb-4">Approve Requisition</h2>
-                            <p className="text-gray-600 mb-4">
-                                Are you sure you want to approve requisition from <span className="font-medium">{selectedRequest.requesterName}</span>?
-                            </p>
-                            <p className="text-sm text-gray-500 mb-4">
-                                After approval, this requisition will be queued for Admin to issue the items.
-                            </p>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                    <span className="text-2xl">✅</span>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900">Approve Requisition</h2>
+                                    <p className="text-sm text-gray-500">Review the details before approving</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                <p className="text-sm text-gray-600 mb-2">
+                                    Approve requisition from <span className="font-medium text-gray-900">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</span>
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    Employee ID: {getEmployeeDisplayId(selectedRequest)} | Items: {selectedRequest.items?.length || 0} | Total Qty: {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+                                </p>
+                            </div>
 
                             <div className="mb-4">
-                                <label className="block text-sm font-medium mb-1">Remarks (Optional)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks (Optional)</label>
                                 <textarea
                                     value={remarks}
                                     onChange={(e) => setRemarks(e.target.value)}
                                     rows="3"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                                    className="input"
                                     placeholder="Add any remarks..."
                                 />
                             </div>
@@ -630,18 +735,18 @@ const RequestApproval = () => {
                                         setShowApproveModal(false);
                                         setRemarks('');
                                     }}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    className="btn btn-secondary"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleApprove}
                                     disabled={processingId === selectedRequest._id}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                                    className="btn btn-primary"
                                 >
                                     {processingId === selectedRequest._id ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                            <span className="spinner-sm"></span>
                                             Approving...
                                         </>
                                     ) : (
@@ -656,21 +761,37 @@ const RequestApproval = () => {
 
             {/* Reject Modal */}
             {showRejectModal && selectedRequest && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowRejectModal(false)}>
-                    <div className="bg-white rounded-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" onClick={() => setShowRejectModal(false)}>
+                    <div className="modal-content max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
                         <div className="p-6">
-                            <h2 className="text-xl font-bold text-gray-900 mb-4">Reject Requisition</h2>
-                            <p className="text-gray-600 mb-4">
-                                Are you sure you want to reject requisition from <span className="font-medium">{selectedRequest.requesterName}</span>?
-                            </p>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                                    <span className="text-2xl">❌</span>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900">Reject Requisition</h2>
+                                    <p className="text-sm text-gray-500">Please provide a reason for rejection</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                <p className="text-sm text-gray-600 mb-2">
+                                    Reject requisition from <span className="font-medium text-gray-900">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</span>
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    Employee ID: {getEmployeeDisplayId(selectedRequest)}
+                                </p>
+                            </div>
 
                             <div className="mb-4">
-                                <label className="block text-sm font-medium mb-1">Reason for Rejection *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Reason for Rejection <span className="text-red-500">*</span>
+                                </label>
                                 <textarea
                                     value={remarks}
                                     onChange={(e) => setRemarks(e.target.value)}
                                     rows="3"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                                    className="input"
                                     placeholder="Please provide a reason..."
                                     required
                                 />
@@ -682,18 +803,18 @@ const RequestApproval = () => {
                                         setShowRejectModal(false);
                                         setRemarks('');
                                     }}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    className="btn btn-secondary"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleReject}
                                     disabled={!remarks || processingId === selectedRequest._id}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                                    className="btn btn-danger"
                                 >
                                     {processingId === selectedRequest._id ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                            <span className="spinner-sm"></span>
                                             Rejecting...
                                         </>
                                     ) : (

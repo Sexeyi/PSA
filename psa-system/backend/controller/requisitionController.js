@@ -118,7 +118,7 @@ exports.approveRequisition = async (req, res) => {
         }
 
         // Check if requisition is still pending
-        if (requisition.status !== "Pending") {
+        if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
                 message: `Requisition already ${requisition.status}`
@@ -184,7 +184,7 @@ exports.approveRequisition = async (req, res) => {
         }
 
         // Update requisition status
-        requisition.status = userRole === 'admin' ? "Issued" : "Approved";
+        requisition.status = userRole === 'admin' ? "issued" : "approved";
         requisition.approvedDate = new Date();
         requisition.approverRemarks = req.body.remarks || "";
         requisition.approvedBy = req.user.fullName;
@@ -228,7 +228,7 @@ exports.issueRequisition = async (req, res) => {
         }
 
         // Check if requisition is approved by SuperAdmin
-        if (requisition.status !== "Approved") {
+        if (requisition.status !== "approved") {
             return res.status(400).json({
                 success: false,
                 message: `Requisition must be approved first. Current status: ${requisition.status}`
@@ -282,7 +282,7 @@ exports.issueRequisition = async (req, res) => {
         }
 
         // Update requisition status
-        requisition.status = "Issued";
+        requisition.status = "issued";
         requisition.approvedDate = new Date();
         requisition.approverRemarks = req.body.remarks || "";
         requisition.approvedBy = req.user.fullName;
@@ -317,7 +317,7 @@ exports.rejectRequisition = async (req, res) => {
         }
 
         // Check if requisition is still pending
-        if (requisition.status !== "Pending") {
+        if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
                 message: `Requisition already ${requisition.status}`
@@ -333,7 +333,7 @@ exports.rejectRequisition = async (req, res) => {
             });
         }
 
-        requisition.status = "Rejected";
+        requisition.status = "rejected";
         requisition.approverRemarks = req.body.remarks || "";
         requisition.approvedDate = new Date();
         requisition.approvedBy = req.user.fullName;
@@ -368,7 +368,7 @@ exports.updateRequisition = async (req, res) => {
         }
 
         // Only allow updates if status is pending
-        if (requisition.status !== "Pending") {
+        if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
                 message: `Cannot update requisition with status: ${requisition.status}`
@@ -411,7 +411,7 @@ exports.deleteRequisition = async (req, res) => {
         }
 
         // Only allow deletion if status is pending
-        if (requisition.status !== "Pending") {
+        if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
                 message: `Cannot delete requisition with status: ${requisition.status}`
