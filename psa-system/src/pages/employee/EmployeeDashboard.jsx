@@ -414,7 +414,7 @@ export default function EmployeeDashboard() {
                                                 <div key={notification.id} className="p-3 hover:bg-gray-50 border-b border-gray-100 cursor-pointer transition-colors">
                                                     <div className="flex items-start space-x-2">
                                                         <div className={`w-2 h-2 mt-1.5 rounded-full ${notification.type === 'urgent' ? 'bg-danger-500' :
-                                                                notification.type === 'approved' ? 'bg-success-500' : 'bg-warning-500'
+                                                            notification.type === 'approved' ? 'bg-success-500' : 'bg-warning-500'
                                                             }`} />
                                                         <div className="flex-1">
                                                             <p className="text-sm text-gray-700">{notification.message}</p>
