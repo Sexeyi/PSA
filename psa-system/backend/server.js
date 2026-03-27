@@ -80,12 +80,12 @@ const seedSuperAdmin = async () => {
         const adminExist = await User.findOne({ role: "superadmin" });
 
         if (!adminExist) {
-            console.log('📝 Creating SuperAdmin...');
+            console.log('Creating SuperAdmin...');
 
             // Check if environment variables exist
             if (!process.env.SUPER_ADMIN_EMAIL || !process.env.SUPER_ADMIN_PASSWORD) {
-                console.log('⚠️ SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD not set in .env file');
-                console.log('📝 Using default credentials for development');
+                console.log(' SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD not set in .env file');
+                console.log(' Using default credentials for development');
 
                 // Use default credentials for development
                 const defaultEmail = 'superadmin@psa.gov.ph';
@@ -102,10 +102,10 @@ const seedSuperAdmin = async () => {
                     status: "active"
                 });
 
-                console.log(`✅ Super Admin Created with:`);
-                console.log(`   Email: ${defaultEmail}`);
-                console.log(`   Password: ${defaultPassword}`);
-                console.log(`   Role: superadmin`);
+                console.log(`Super Admin Created with:`);
+                console.log(`Email: ${defaultEmail}`);
+                console.log(`Password: ${defaultPassword}`);
+                console.log(`Role: superadmin`);
 
             } else {
                 // Create user with env credentials - WITHOUT hashing
@@ -119,32 +119,32 @@ const seedSuperAdmin = async () => {
                     status: "active"
                 });
 
-                console.log(`✅ Super Admin Created with:`);
-                console.log(`   Email: ${process.env.SUPER_ADMIN_EMAIL}`);
-                console.log(`   Password: ${process.env.SUPER_ADMIN_PASSWORD}`);
-                console.log(`   Role: superadmin`);
+                console.log(`Super Admin Created with:`);
+                console.log(`Email: ${process.env.SUPER_ADMIN_EMAIL}`);
+                console.log(`Password: ${process.env.SUPER_ADMIN_PASSWORD}`);
+                console.log(`Role: superadmin`);
             }
 
             // Verify the created admin works
             const createdAdmin = await User.findOne({ role: "superadmin" });
-            console.log(`🔐 Password hash created: ${!!createdAdmin.password}`);
+            console.log(`Password hash created: ${!!createdAdmin.password}`);
 
         } else {
-            console.log(`✅ Super Admin already exists: ${adminExist.email}`);
+            console.log(`Super Admin already exists: ${adminExist.email}`);
 
             // Optional: Verify the existing admin's password works with .env
             if (process.env.SUPER_ADMIN_PASSWORD && process.env.NODE_ENV === 'development') {
                 const isMatch = await adminExist.comparePassword(process.env.SUPER_ADMIN_PASSWORD);
-                console.log(`🔐 Existing admin password verification: ${isMatch ? '✅ Works!' : '❌ Failed!'}`);
+                console.log(`Existing admin password verification: ${isMatch ? 'Works!' : 'Failed!'}`);
 
                 if (!isMatch) {
-                    console.log('⚠️ Warning: Existing superadmin password does not match .env file');
-                    console.log('   You may need to update the password or use the current one');
+                    console.log('Warning: Existing superadmin password does not match .env file');
+                    console.log('You may need to update the password or use the current one');
                 }
             }
         }
     } catch (error) {
-        console.error('❌ Error seeding SuperAdmin:', error);
+        console.error('Error seeding SuperAdmin:', error);
         console.error('Error details:', error.message);
         if (error.code === 11000) {
             console.error('Duplicate key error. This might mean a user already exists with the same employeeId or email.');
@@ -160,20 +160,20 @@ const startServer = async () => {
         // Log database collections for debugging
         if (process.env.NODE_ENV === 'development') {
             const collections = await mongoose.connection.db.listCollections().toArray();
-            console.log('📚 Database collections:', collections.map(c => c.name));
+            console.log('Database collections:', collections.map(c => c.name));
         }
 
         await seedSuperAdmin();
 
         app.listen(PORT, () => {
-            console.log(`\n🚀 Server running on port ${PORT}`);
-            console.log(`📊 MongoDB connection state: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
-            console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-            console.log(`🌐 Frontend URL: http://localhost:5173`);
-            console.log(`\n✅ Ready to accept requests`);
+            console.log(`\nServer running on port ${PORT}`);
+            console.log(`MongoDB connection state: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`Frontend URL: http://localhost:5173`);
+            console.log(`\nReady to accept requests`);
         });
     } catch (error) {
-        console.error('❌ Failed to start server:', error);
+        console.error('Failed to start server:', error);
         process.exit(1);
     }
 };

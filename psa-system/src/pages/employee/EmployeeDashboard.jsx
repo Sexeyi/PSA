@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import './EmployeeDashboard.css';
 
 // Simple icon components
 const IconClock = () => (
@@ -73,6 +74,12 @@ const IconTrendingDown = () => (
     </svg>
 );
 
+const IconUser = () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+);
+
 const daysAgoLabel = (date) => {
     if (!date) return "N/A";
     const today = new Date();
@@ -99,20 +106,66 @@ const formatDateTime = (date) => {
 };
 
 export default function EmployeeDashboard() {
+    const [user, setUser] = useState(null);
     const [requisitions, setRequisitions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [filter, setFilter] = useState("All");
     const [calDate, setCalDate] = useState(new Date());
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("date");
     const [sortOrder, setSortOrder] = useState("desc");
     const [selectedRequest, setSelectedRequest] = useState(null);
-    const [showNotifications, setShowNotifications] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [viewMode, setViewMode] = useState("list");
+    const [sidebarWidth, setSidebarWidth] = useState(0);
+
+    // Detect sidebar width
+    useEffect(() => {
+        const updateSidebarWidth = () => {
+            const sidebar = document.querySelector('.sidebar, .side-menu, [class*="sidebar"], [class*="side-menu"]');
+            if (sidebar) {
+                const width = sidebar.offsetWidth;
+                setSidebarWidth(width);
+            } else {
+                setSidebarWidth(0);
+            }
+        };
+
+        updateSidebarWidth();
+        window.addEventListener('resize', updateSidebarWidth);
+
+        const observer = new MutationObserver(updateSidebarWidth);
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        return () => {
+            window.removeEventListener('resize', updateSidebarWidth);
+            observer.disconnect();
+        };
+    }, []);
+
+    // Get user data
+    useEffect(() => {
+        const userData = localStorage.getItem('user');
+        const token = localStorage.getItem('token');
+
+        if (!userData || !token) {
+            // navigate('/login'); - Add navigation if needed
+            return;
+        }
+
+        try {
+            const parsedUser = JSON.parse(userData);
+            setUser(parsedUser);
+        } catch (error) {
+            console.error('Error parsing user data:', error);
+        }
+    }, []);
 
     const fetchRequisitions = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const token = localStorage.getItem("token");
             const response = await fetch("http://localhost:5000/api/requisitions", {
@@ -125,6 +178,7 @@ export default function EmployeeDashboard() {
             setLastUpdated(new Date());
         } catch (error) {
             console.error("Fetch requisitions error:", error);
+            setError('Failed to load requisitions. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -159,7 +213,6 @@ export default function EmployeeDashboard() {
             thisMonth: thisMonth.length,
             lastMonth: lastMonth.length,
             approvalRate: requisitions.length ? ((approved.length / requisitions.length) * 100).toFixed(1) : 0,
-            averageProcessingTime: "2.4 days",
         };
     }, [requisitions]);
 
@@ -200,36 +253,12 @@ export default function EmployeeDashboard() {
         return result;
     }, [filter, requisitions, searchTerm, sortBy, sortOrder]);
 
-    const notifications = useMemo(() => {
-        const pendingRequisitions = requisitions.filter(r => r.status === "Pending");
-        const urgentRequisitions = requisitions.filter(r => r.priority === "high" && r.status === "Pending");
-        const recentlyApproved = requisitions.filter(r => {
-            const date = new Date(r.createdAt);
-            const daysDiff = (new Date() - date) / 86400000;
-            return r.status === "Approved" && daysDiff <= 1;
-        });
-
-        return [
-            ...urgentRequisitions.slice(0, 2).map(r => ({
-                id: r._id,
-                type: "urgent",
-                message: `Urgent: ${r.title || r.itemName} requires immediate attention`,
-                time: "Just now",
-            })),
-            ...pendingRequisitions.slice(0, 3).map(r => ({
-                id: r._id,
-                type: "pending",
-                message: `${r.title || r.itemName} is pending approval`,
-                time: daysAgoLabel(r.createdAt),
-            })),
-            ...recentlyApproved.slice(0, 2).map(r => ({
-                id: r._id,
-                type: "approved",
-                message: `${r.title || r.itemName} has been approved`,
-                time: "Recently",
-            }))
-        ];
-    }, [requisitions]);
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good morning';
+        if (hour < 18) return 'Good afternoon';
+        return 'Good evening';
+    };
 
     const getDaysInMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     const getFirstDay = (d) => new Date(d.getFullYear(), d.getMonth(), 1).getDay();
@@ -243,7 +272,7 @@ export default function EmployeeDashboard() {
 
         for (let i = firstDay - 1; i >= 0; i--) {
             days.push(
-                <div key={`p${i}`} className="text-gray-400 text-center py-2 text-sm hover:bg-gray-50 rounded-lg transition-colors">
+                <div key={`p${i}`} className="date empty">
                     {prevDays - i}
                 </div>
             );
@@ -254,22 +283,13 @@ export default function EmployeeDashboard() {
             const hasEvent = requisitions.some(r => r.createdAt?.slice(0, 10) === ds);
             const isToday = today.getDate() === i && today.getMonth() === calDate.getMonth() && today.getFullYear() === calDate.getFullYear();
 
-            let dayClass = "text-center py-2 text-sm relative cursor-pointer hover:scale-105 transition-all duration-200";
-
-            if (isToday) {
-                dayClass += " bg-primary-500 text-white hover:bg-primary-600 font-semibold shadow-lg rounded-lg";
-            } else if (hasEvent) {
-                dayClass += " bg-primary-50 text-primary-700 font-medium hover:bg-primary-100 rounded-lg";
-            } else {
-                dayClass += " hover:bg-gray-50 rounded-lg";
-            }
+            let dayClass = "date";
+            if (isToday) dayClass += " today";
+            if (hasEvent && !isToday) dayClass += " has-event";
 
             days.push(
                 <div key={i} className={dayClass}>
                     {i}
-                    {hasEvent && !isToday && (
-                        <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
-                    )}
                 </div>
             );
         }
@@ -277,7 +297,7 @@ export default function EmployeeDashboard() {
         const rem = 42 - days.length;
         for (let i = 1; i <= rem; i++) {
             days.push(
-                <div key={`n${i}`} className="text-gray-400 text-center py-2 text-sm hover:bg-gray-50 rounded-lg transition-colors">
+                <div key={`n${i}`} className="date empty">
                     {i}
                 </div>
             );
@@ -287,30 +307,28 @@ export default function EmployeeDashboard() {
     };
 
     const badgeClass = (status) => {
-        const baseClass = "badge";
         switch (status?.toLowerCase()) {
             case 'pending':
-                return `${baseClass} badge-pending`;
+                return 'badge-pending';
             case 'approved':
-                return `${baseClass} badge-approved`;
+                return 'badge-approved';
             case 'rejected':
-                return `${baseClass} badge-rejected`;
+                return 'badge-rejected';
             default:
-                return `${baseClass}`;
+                return 'badge';
         }
     };
 
     const priorityClass = (priority) => {
-        const baseClass = "badge";
         switch (priority?.toLowerCase()) {
             case 'high':
-                return `${baseClass} priority-high`;
+                return 'priority-high';
             case 'medium':
-                return `${baseClass} priority-medium`;
+                return 'priority-medium';
             case 'low':
-                return `${baseClass} priority-low`;
+                return 'priority-low';
             default:
-                return `${baseClass}`;
+                return '';
         }
     };
 
@@ -325,424 +343,421 @@ export default function EmployeeDashboard() {
         URL.revokeObjectURL(url);
     };
 
+    const handleLogout = () => {
+        localStorage.clear();
+        // navigate('/login'); - Add navigation if needed
+    };
+
+    const handleProfile = () => {
+        // navigate('/profile'); - Add navigation if needed
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showProfileMenu && !event.target.closest('.profile-menu')) {
+                setShowProfileMenu(false);
+            }
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [showProfileMenu]);
+
     if (loading) {
         return (
-            <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
-                <div className="text-center">
-                    <div className="spinner-lg"></div>
-                    <p className="mt-4 text-gray-600 font-medium">Loading dashboard...</p>
-                    <p className="text-sm text-gray-400 mt-1">Fetching your latest requests</p>
+            <div className="employee-dashboard" style={{ marginLeft: sidebarWidth }}>
+                <div className="flex-center" style={{ minHeight: '100vh' }}>
+                    <div className="text-center">
+                        <div className="spinner-lg"></div>
+                        <p className="mt-4 text-secondary">Loading your requests...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="employee-dashboard" style={{ marginLeft: sidebarWidth }}>
+                <div className="flex-center" style={{ minHeight: '100vh' }}>
+                    <div className="text-center">
+                        <div className="text-danger" style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+                        <h2 className="text-xl mb-2">Error Loading Dashboard</h2>
+                        <p className="text-secondary mb-4">{error}</p>
+                        <button onClick={fetchRequisitions} className="btn btn-primary">
+                            Retry
+                        </button>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-            {/* Top Navigation Bar */}
-            <div className="bg-white border-b border-gray-200 shadow-sm shrink-0">
-                <div className="px-6 sm:px-8 lg:px-10 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
+        <div className="employee-dashboard" style={{ marginLeft: sidebarWidth, width: `calc(100% - ${sidebarWidth}px)` }}>
+            <div className="dashboard-header">
+                <div className="flex-between">
+                    <div>
+                        <h1>{getGreeting()}, {user?.fullName?.split(' ')[0] || 'Employee'}!</h1>
+                        <p>
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            })}
+                        </p>
+                    </div>
+
+                    {/* Profile Dropdown */}
+                    <div className="profile-menu">
+                        <button
+                            onClick={() => setShowProfileMenu(!showProfileMenu)}
+                            className="flex-center gap-3 hover-bg-secondary px-3 py-2 rounded-lg transition-all"
+                        >
+                            <div className="card-icon" style={{ background: 'rgba(2, 62, 138, 0.1)' }}>
+                                <span style={{ fontSize: '1.25rem' }}>
+                                    {user?.fullName?.charAt(0) || 'E'}
+                                </span>
+                            </div>
+                            <div className="text-left hidden sm:block">
+                                <p className="font-medium text-primary">{user?.fullName || 'Employee'}</p>
+                                <p className="text-xs text-secondary capitalize">{user?.role || 'employee'}</p>
+                            </div>
+                            <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        {showProfileMenu && (
+                            <div className="profile-dropdown">
+                                <div className="profile-dropdown-header">
+                                    <p className="font-semibold">{user?.fullName}</p>
+                                    <p className="text-sm text-secondary mt-1">{user?.email}</p>
+                                    <p className="text-xs text-secondary mt-1 capitalize">{user?.role}</p>
                                 </div>
-                                <div>
-                                    <h1 className="text-xl font-bold text-gray-900">Request Management</h1>
-                                    <p className="text-xs text-gray-500">Track and manage all your requisitions</p>
+                                <div className="profile-dropdown-actions">
+                                    <button onClick={handleProfile} className="dropdown-item">
+                                        My Profile
+                                    </button>
+                                </div>
+                                <div className="dropdown-divider"></div>
+                                <div className="profile-dropdown-actions">
+                                    <button onClick={handleLogout} className="dropdown-item text-danger">
+                                        Logout
+                                    </button>
                                 </div>
                             </div>
-
-                            <div className="hidden md:flex items-center space-x-2 ml-4">
-                                <div className="px-2 py-1 bg-success-50 rounded-md border border-success-200">
-                                    <span className="text-xs font-medium text-success-700">
-                                        {stats.approvalRate}% Approval Rate
-                                    </span>
-                                </div>
-                                <div className="px-2 py-1 bg-primary-50 rounded-md border border-primary-200">
-                                    <span className="text-xs font-medium text-primary-700">
-                                        Avg. {stats.averageProcessingTime}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center space-x-3">
-                            <div className="hidden sm:flex items-center space-x-1 text-xs text-gray-500">
-                                <IconClock />
-                                <span>Updated {formatDateTime(lastUpdated)}</span>
-                            </div>
-
-                            <button
-                                onClick={fetchRequisitions}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                title="Refresh data"
-                            >
-                                <IconRefresh />
-                            </button>
-
-                            <button
-                                onClick={handleExport}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                title="Export data"
-                            >
-                                <IconDownload />
-                            </button>
-
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowNotifications(!showNotifications)}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
-                                >
-                                    <IconBell />
-                                    {notifications.length > 0 && (
-                                        <span className="absolute top-1 right-1 w-2 h-2 bg-danger-500 rounded-full animate-pulse"></span>
-                                    )}
-                                </button>
-
-                                {showNotifications && (
-                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 animate-slide-up">
-                                        <div className="p-3 border-b border-gray-200">
-                                            <h3 className="font-semibold text-gray-900">Notifications</h3>
-                                            <p className="text-xs text-gray-500 mt-1">{notifications.length} new updates</p>
-                                        </div>
-                                        <div className="max-h-96 overflow-y-auto">
-                                            {notifications.map(notification => (
-                                                <div key={notification.id} className="p-3 hover:bg-gray-50 border-b border-gray-100 cursor-pointer transition-colors">
-                                                    <div className="flex items-start space-x-2">
-                                                        <div className={`w-2 h-2 mt-1.5 rounded-full ${notification.type === 'urgent' ? 'bg-danger-500' :
-                                                            notification.type === 'approved' ? 'bg-success-500' : 'bg-warning-500'
-                                                            }`} />
-                                                        <div className="flex-1">
-                                                            <p className="text-sm text-gray-700">{notification.message}</p>
-                                                            <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 overflow-y-auto">
-                <div className="container-custom py-6">
+            {/* KPI Cards */}
+            <div className="dashboard-cards">
+                <div className="card">
+                    <div className="card-icon">
+                        <span>📋</span>
+                    </div>
+                    <div className="card-content">
+                        <h3>Total Requests</h3>
+                        <div className="card-value">{stats.total}</div>
+                        <div className="card-change">This month: +{stats.thisMonth}</div>
+                    </div>
+                </div>
 
-                    {/* KPI Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-                        <div className="card p-5">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-500">Total Requests</span>
-                                <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
-                            </div>
-                            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                            <div className="flex items-center justify-between mt-2">
-                                <p className="text-xs text-gray-500">This month: +{stats.thisMonth}</p>
-                                <div className={`text-xs flex items-center gap-1 ${stats.thisMonth > stats.lastMonth ? 'text-success-600' : 'text-danger-600'}`}>
-                                    {stats.thisMonth > stats.lastMonth ? <IconTrendingUp /> : <IconTrendingDown />}
-                                    {stats.lastMonth ? ((stats.thisMonth - stats.lastMonth) / stats.lastMonth * 100).toFixed(0) : 0}%
-                                </div>
-                            </div>
-                        </div>
+                <div className="card">
+                    <div className="card-icon" style={{ background: 'rgba(234, 179, 8, 0.1)' }}>
+                        <span>⏳</span>
+                    </div>
+                    <div className="card-content">
+                        <h3>Pending</h3>
+                        <div className="card-value" style={{ color: '#eab308' }}>{stats.pending}</div>
+                        <div className="card-change">Awaiting approval</div>
+                    </div>
+                </div>
 
-                        <div className="card p-5">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-500">Pending</span>
-                                <IconClock />
-                            </div>
-                            <p className="text-2xl font-bold text-warning-600">{stats.pending}</p>
-                            <div className="progress-bar mt-2">
-                                <div className="progress-bar-fill bg-warning-500" style={{ width: `${stats.total ? (stats.pending / stats.total) * 100 : 0}%` }} />
-                            </div>
-                        </div>
+                <div className="card">
+                    <div className="card-icon" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
+                        <span>✅</span>
+                    </div>
+                    <div className="card-content">
+                        <h3>Approved</h3>
+                        <div className="card-value" style={{ color: '#22c55e' }}>{stats.approved}</div>
+                        <div className="card-change">{stats.approvalRate}% approval rate</div>
+                    </div>
+                </div>
 
-                        <div className="card p-5">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-500">Approved</span>
-                                <IconCheckCircle />
-                            </div>
-                            <p className="text-2xl font-bold text-success-600">{stats.approved}</p>
-                            <div className="progress-bar mt-2">
-                                <div className="progress-bar-fill bg-success-500" style={{ width: `${stats.total ? (stats.approved / stats.total) * 100 : 0}%` }} />
-                            </div>
-                        </div>
+                <div className="card">
+                    <div className="card-icon" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
+                        <span>❌</span>
+                    </div>
+                    <div className="card-content">
+                        <h3>Rejected</h3>
+                        <div className="card-value" style={{ color: '#ef4444' }}>{stats.rejected}</div>
+                        <div className="card-change">Need review</div>
+                    </div>
+                </div>
+            </div>
 
-                        <div className="card p-5">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-500">Rejected</span>
-                                <IconXCircle />
-                            </div>
-                            <p className="text-2xl font-bold text-danger-600">{stats.rejected}</p>
-                            <div className="progress-bar mt-2">
-                                <div className="progress-bar-fill bg-danger-500" style={{ width: `${stats.total ? (stats.rejected / stats.total) * 100 : 0}%` }} />
+            {/* Main Content Grid */}
+            <div className="dashboard-grid">
+                {/* Requests Section */}
+                <div className="dashboard-section">
+                    <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+                        <h2>My Requests</h2>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={fetchRequisitions}
+                                className="icon-button"
+                                title="Refresh"
+                            >
+                                <IconRefresh />
+                            </button>
+                            <button
+                                onClick={handleExport}
+                                className="icon-button"
+                                title="Export"
+                            >
+                                <IconDownload />
+                            </button>
+                            <div className="view-toggle">
+                                <button
+                                    onClick={() => setViewMode("list")}
+                                    className={`toggle-btn ${viewMode === "list" ? "active" : ""}`}
+                                >
+                                    List
+                                </button>
+                                <button
+                                    onClick={() => setViewMode("grid")}
+                                    className={`toggle-btn ${viewMode === "grid" ? "active" : ""}`}
+                                >
+                                    Grid
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Main Content Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Requests Table */}
-                        <div className="lg:col-span-2 card flex flex-col h-[600px] overflow-hidden">
-                            <div className="p-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white shrink-0">
-                                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <h2 className="text-lg font-semibold text-gray-900">Recent Requests</h2>
-                                            <p className="text-xs text-gray-500 mt-0.5">Manage and track your submissions</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
-                                        <button
-                                            onClick={() => setViewMode("list")}
-                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-primary-600" : "text-gray-600 hover:bg-gray-200"}`}
-                                        >
-                                            List
-                                        </button>
-                                        <button
-                                            onClick={() => setViewMode("grid")}
-                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === "grid" ? "bg-white shadow-sm text-primary-600" : "text-gray-600 hover:bg-gray-200"}`}
-                                        >
-                                            Grid
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-wrap gap-3">
-                                    <div className="flex-1 min-w-[200px] relative">
-                                        <IconSearch />
-                                        <input
-                                            type="text"
-                                            placeholder="Search by title or ID..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="input pl-9"
-                                        />
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <select
-                                            value={sortBy}
-                                            onChange={(e) => setSortBy(e.target.value)}
-                                            className="input w-auto"
-                                        >
-                                            <option value="date">Sort by Date</option>
-                                            <option value="status">Sort by Status</option>
-                                            <option value="priority">Sort by Priority</option>
-                                        </select>
-
-                                        <button
-                                            onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                                            className="btn btn-secondary px-3"
-                                        >
-                                            {sortOrder === "desc" ? "↓" : "↑"}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2 mt-4">
-                                    {["All", "Pending", "Approved", "Rejected"].map(s => (
-                                        <button
-                                            key={s}
-                                            onClick={() => setFilter(s)}
-                                            className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-secondary'}`}
-                                        >
-                                            {s}
-                                            {s !== "All" && (
-                                                <span className="ml-1.5 text-xs opacity-75">
-                                                    ({s === "Pending" ? stats.pending : s === "Approved" ? stats.approved : stats.rejected})
-                                                </span>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="overflow-y-auto flex-1">
-                                {viewMode === "list" ? (
-                                    <table className="table">
-                                        <thead className="sticky top-0">
-                                            <tr>
-                                                <th>ID</th>
-                                                <th>Title</th>
-                                                <th>Status</th>
-                                                <th>Priority</th>
-                                                <th>Created</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filtered.map((r) => (
-                                                <tr
-                                                    key={r._id}
-                                                    className="cursor-pointer"
-                                                    onClick={() => setSelectedRequest(r)}
-                                                >
-                                                    <td>
-                                                        <span className="text-sm font-mono text-primary-600 font-medium">
-                                                            {r.requestNumber || r._id?.slice(-6)}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <div className="text-sm font-medium text-gray-900">
-                                                            {r.title || r.itemName}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <span className={badgeClass(r.status)}>
-                                                            {r.status}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span className={priorityClass(r.priority)}>
-                                                            {r.priority}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span className="text-sm text-gray-500">{daysAgoLabel(r.createdAt)}</span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
-                                        {filtered.map((r) => (
-                                            <div
-                                                key={r._id}
-                                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer hover:border-primary-200"
-                                                onClick={() => setSelectedRequest(r)}
-                                            >
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <div className="flex-1">
-                                                        <h3 className="font-medium text-gray-900">{r.title || r.itemName}</h3>
-                                                        <p className="text-xs text-gray-500 mt-1">ID: {r.requestNumber || r._id?.slice(-6)}</p>
-                                                    </div>
-                                                    <span className={priorityClass(r.priority)}>
-                                                        {r.priority}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between mt-3">
-                                                    <span className={badgeClass(r.status)}>
-                                                        {r.status}
-                                                    </span>
-                                                    <span className="text-xs text-gray-500">{daysAgoLabel(r.createdAt)}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {filtered.length === 0 && (
-                                    <div className="text-center py-12">
-                                        <div className="text-5xl mb-3">📭</div>
-                                        <p className="text-gray-500 font-medium">No requests found</p>
-                                        <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filters</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {filtered.length > 0 && (
-                                <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex justify-between items-center shrink-0">
-                                    <span>Showing {filtered.length} of {requisitions.length} requests</span>
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-primary-600 font-medium">{stats.approvalRate}%</span>
-                                        <span className="text-gray-400">approval rate</span>
-                                    </div>
-                                </div>
-                            )}
+                    {/* Filters */}
+                    <div className="filters-section">
+                        <div className="search-wrapper">
+                            <IconSearch />
+                            <input
+                                type="text"
+                                placeholder="Search by title or ID..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="search-input"
+                            />
                         </div>
 
-                        {/* Right Sidebar */}
-                        <div className="space-y-6">
-                            {/* Calendar Card */}
-                            <div className="card p-5">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center space-x-2">
-                                        <IconCalendar />
-                                        <h3 className="font-semibold text-gray-900">Activity Calendar</h3>
-                                    </div>
-                                    <div className="flex space-x-1">
-                                        <button
-                                            onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1, 1))}
-                                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                                        >
-                                            <IconChevronLeft />
-                                        </button>
-                                        <button
-                                            onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() + 1, 1))}
-                                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                                        >
-                                            <IconChevronRight />
-                                        </button>
-                                    </div>
-                                </div>
+                        <div className="sort-controls">
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="sort-select"
+                            >
+                                <option value="date">Sort by Date</option>
+                                <option value="status">Sort by Status</option>
+                                <option value="priority">Sort by Priority</option>
+                            </select>
+                            <button
+                                onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                                className="sort-order-btn"
+                            >
+                                {sortOrder === "desc" ? "↓" : "↑"}
+                            </button>
+                        </div>
+                    </div>
 
-                                <div className="text-center mb-3">
-                                    <h4 className="text-sm font-semibold text-gray-900">
-                                        {calDate.toLocaleString("default", { month: "long", year: "numeric" })}
-                                    </h4>
-                                </div>
+                    <div className="status-filters">
+                        {["All", "Pending", "Approved", "Rejected"].map(s => (
+                            <button
+                                key={s}
+                                onClick={() => setFilter(s)}
+                                className={`status-filter-btn ${filter === s ? 'active' : ''}`}
+                            >
+                                {s}
+                                {s !== "All" && (
+                                    <span className="filter-count">
+                                        ({s === "Pending" ? stats.pending : s === "Approved" ? stats.approved : stats.rejected})
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
 
-                                <div className="grid grid-cols-7 gap-1">
-                                    {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d, i) => (
-                                        <div key={i} className="text-center py-1 text-xs font-semibold text-primary-600">
-                                            {d}
-                                        </div>
-                                    ))}
-                                    {renderCal()}
-                                </div>
-
-                                <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2 text-xs">
-                                    <div className="bg-primary-50 rounded-lg p-2 text-center">
-                                        <p className="text-primary-600 font-semibold">
-                                            {requisitions.filter(r => {
-                                                const date = new Date(r.createdAt);
-                                                return date.getMonth() === calDate.getMonth() && date.getFullYear() === calDate.getFullYear();
-                                            }).length}
-                                        </p>
-                                        <p className="text-gray-500 text-xs">This month</p>
-                                    </div>
-                                    <div className="bg-success-50 rounded-lg p-2 text-center">
-                                        <p className="text-success-600 font-semibold">{stats.approvalRate}%</p>
-                                        <p className="text-gray-500 text-xs">Approval rate</p>
-                                    </div>
-                                </div>
+                    {/* Requests List */}
+                    <div className="requests-list">
+                        {viewMode === "list" ? (
+                            <div className="table-wrapper">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Title</th>
+                                            <th>Status</th>
+                                            <th>Priority</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtered.map((r) => (
+                                            <tr
+                                                key={r._id}
+                                                className="cursor-pointer"
+                                                onClick={() => setSelectedRequest(r)}
+                                            >
+                                                <td>
+                                                    <span className="request-id">
+                                                        {r.requestNumber || r._id?.slice(-6)}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="request-title">
+                                                        {r.title || r.itemName}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className={`badge ${badgeClass(r.status)}`}>
+                                                        {r.status}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span className={`badge ${priorityClass(r.priority)}`}>
+                                                        {r.priority}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span className="text-secondary text-sm">{daysAgoLabel(r.createdAt)}</span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-
-                            {/* Recent Activity Feed */}
-                            <div className="card p-5">
-                                <h3 className="font-semibold text-gray-900 mb-3">Recent Activity</h3>
-                                <div className="space-y-3">
-                                    {filtered.slice(0, 5).map((r) => (
-                                        <div key={r._id} className="flex items-start space-x-2 text-sm">
-                                            <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-primary-500"></div>
+                        ) : (
+                            <div className="grid-view">
+                                {filtered.map((r) => (
+                                    <div
+                                        key={r._id}
+                                        className="grid-card"
+                                        onClick={() => setSelectedRequest(r)}
+                                    >
+                                        <div className="flex-between mb-2">
                                             <div className="flex-1">
-                                                <p className="text-gray-700">{r.title || r.itemName}</p>
-                                                <p className="text-xs text-gray-400">{daysAgoLabel(r.createdAt)}</p>
+                                                <h3 className="font-medium">{r.title || r.itemName}</h3>
+                                                <p className="text-xs text-secondary mt-1">
+                                                    ID: {r.requestNumber || r._id?.slice(-6)}
+                                                </p>
                                             </div>
-                                            <span className={badgeClass(r.status)}>
-                                                {r.status}
+                                            <span className={`badge ${priorityClass(r.priority)}`}>
+                                                {r.priority}
                                             </span>
                                         </div>
-                                    ))}
-                                </div>
+                                        <div className="flex-between mt-3">
+                                            <span className={`badge ${badgeClass(r.status)}`}>
+                                                {r.status}
+                                            </span>
+                                            <span className="text-xs text-secondary">{daysAgoLabel(r.createdAt)}</span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
+                        )}
+
+                        {filtered.length === 0 && (
+                            <div className="empty-state">
+                                <div className="text-5xl mb-3">📭</div>
+                                <p className="text-secondary font-medium">No requests found</p>
+                                <p className="text-sm text-secondary mt-1">Try adjusting your search or filters</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {filtered.length > 0 && (
+                        <div className="table-footer">
+                            <span>Showing {filtered.length} of {requisitions.length} requests</span>
+                            <div className="flex-center gap-2">
+                                <span className="text-primary font-medium">{stats.approvalRate}%</span>
+                                <span className="text-secondary">approval rate</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Sidebar */}
+                <div className="dashboard-sidebar">
+                    {/* Calendar Card */}
+                    <div className="dashboard-section">
+                        <div className="flex-between mb-4">
+                            <div className="flex-center gap-2">
+                                <IconCalendar />
+                                <h2>Activity Calendar</h2>
+                            </div>
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1, 1))}
+                                    className="calendar-nav-btn"
+                                >
+                                    <IconChevronLeft />
+                                </button>
+                                <button
+                                    onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() + 1, 1))}
+                                    className="calendar-nav-btn"
+                                >
+                                    <IconChevronRight />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="calendar-month">
+                            <h3>
+                                {calDate.toLocaleString("default", { month: "long", year: "numeric" })}
+                            </h3>
+                        </div>
+
+                        <div className="calendar-grid">
+                            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d, i) => (
+                                <div key={i} className="calendar-weekday">
+                                    {d}
+                                </div>
+                            ))}
+                            {renderCal()}
+                        </div>
+
+                        <div className="calendar-stats">
+                            <div className="stat-box primary">
+                                <p className="stat-number">
+                                    {requisitions.filter(r => {
+                                        const date = new Date(r.createdAt);
+                                        return date.getMonth() === calDate.getMonth() && date.getFullYear() === calDate.getFullYear();
+                                    }).length}
+                                </p>
+                                <p className="stat-label">This month</p>
+                            </div>
+                            <div className="stat-box success">
+                                <p className="stat-number">{stats.approvalRate}%</p>
+                                <p className="stat-label">Approval rate</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Recent Activity */}
+                    <div className="dashboard-section">
+                        <h2>Recent Activity</h2>
+                        <div className="activity-list">
+                            {filtered.slice(0, 5).map((r) => (
+                                <div key={r._id} className="activity-item">
+                                    <div className="activity-dot"></div>
+                                    <div className="flex-1">
+                                        <p className="font-medium text-sm">{r.title || r.itemName}</p>
+                                        <p className="text-xs text-secondary">{daysAgoLabel(r.createdAt)}</p>
+                                    </div>
+                                    <span className={`badge ${badgeClass(r.status)}`}>
+                                        {r.status}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -751,48 +766,48 @@ export default function EmployeeDashboard() {
             {/* Request Details Modal */}
             {selectedRequest && (
                 <div className="modal-overlay" onClick={() => setSelectedRequest(null)}>
-                    <div className="modal-content max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-gray-200 p-5 flex items-center justify-between">
-                            <h3 className="text-lg font-semibold text-gray-900">Request Details</h3>
-                            <button onClick={() => setSelectedRequest(null)} className="text-gray-400 hover:text-gray-600">
-                                <IconXCircle />
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="text-lg font-semibold">Request Details</h3>
+                            <button onClick={() => setSelectedRequest(null)} className="modal-close">
+                                ✕
                             </button>
                         </div>
-                        <div className="p-5 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="modal-body">
+                            <div className="details-grid">
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase">Request ID</label>
+                                    <label className="detail-label">Request ID</label>
                                     <p className="font-mono text-sm">{selectedRequest.requestNumber || selectedRequest._id}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase">Status</label>
-                                    <p className={badgeClass(selectedRequest.status)}>{selectedRequest.status}</p>
+                                    <label className="detail-label">Status</label>
+                                    <p className={`badge ${badgeClass(selectedRequest.status)}`}>{selectedRequest.status}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase">Title</label>
+                                    <label className="detail-label">Title</label>
                                     <p className="font-medium">{selectedRequest.title || selectedRequest.itemName}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase">Priority</label>
-                                    <p className={priorityClass(selectedRequest.priority)}>{selectedRequest.priority}</p>
+                                    <label className="detail-label">Priority</label>
+                                    <p className={`badge ${priorityClass(selectedRequest.priority)}`}>{selectedRequest.priority}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase">Created</label>
+                                    <label className="detail-label">Created</label>
                                     <p>{new Date(selectedRequest.createdAt).toLocaleString()}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase">Last Updated</label>
+                                    <label className="detail-label">Last Updated</label>
                                     <p>{new Date(selectedRequest.updatedAt).toLocaleString()}</p>
                                 </div>
                             </div>
                             {selectedRequest.notes && (
-                                <div>
-                                    <label className="text-xs text-gray-500 uppercase">Notes</label>
-                                    <p className="text-gray-700 mt-1">{selectedRequest.notes}</p>
+                                <div className="mt-4">
+                                    <label className="detail-label">Notes</label>
+                                    <p className="text-secondary mt-1">{selectedRequest.notes}</p>
                                 </div>
                             )}
                         </div>
-                        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 flex justify-end">
+                        <div className="modal-footer">
                             <button onClick={() => setSelectedRequest(null)} className="btn btn-primary">
                                 Close
                             </button>

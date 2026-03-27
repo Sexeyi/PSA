@@ -4,6 +4,7 @@ import {
   LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import './SuperAdminDashboard.css';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -294,10 +295,12 @@ const SuperAdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="spinner-lg"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
+      <div className="dashboard">
+        <div className="flex-center" style={{ minHeight: '100vh' }}>
+          <div className="text-center">
+            <div className="spinner-lg"></div>
+            <p className="mt-4 text-secondary">Loading dashboard data...</p>
+          </div>
         </div>
       </div>
     );
@@ -305,17 +308,19 @@ const SuperAdminDashboard = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-danger-500 text-5xl mb-4">⚠️</div>
-          <div className="text-xl text-gray-800 mb-2">Error Loading Dashboard</div>
-          <div className="text-gray-600 mb-4">{error}</div>
-          <button
-            onClick={() => window.location.reload()}
-            className="btn btn-primary"
-          >
-            Retry
-          </button>
+      <div className="dashboard">
+        <div className="flex-center" style={{ minHeight: '100vh' }}>
+          <div className="text-center">
+            <div className="text-danger" style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+            <h2 className="text-xl mb-2">Error Loading Dashboard</h2>
+            <p className="text-secondary mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn btn-primary"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -324,15 +329,12 @@ const SuperAdminDashboard = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container-custom py-8">
-        {/* Header with Profile */}
-        <div className="flex justify-between items-start mb-8 animate-fade-in">
+    <div className="dashboard">
+      <div className="dashboard-header">
+        <div className="flex-between">
           <div>
-            <h1 className="gradient-text text-3xl font-bold">
-              {getGreeting()}, {user.fullName?.split(' ')[0] || 'Admin'}!
-            </h1>
-            <p className="text-gray-600 mt-2">
+            <h1>{getGreeting()}, {user.fullName?.split(' ')[0] || 'Admin'}!</h1>
+            <p>
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -343,45 +345,40 @@ const SuperAdminDashboard = () => {
           </div>
 
           {/* Profile Dropdown */}
-          <div className="relative profile-menu">
+          <div className="profile-menu">
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center gap-3 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors"
+              className="flex-center gap-3 hover-bg-secondary px-3 py-2 rounded-lg transition-all"
             >
-              <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-lg">
+              <div className="card-icon" style={{ background: 'rgba(2, 62, 138, 0.1)' }}>
+                <span style={{ fontSize: '1.25rem' }}>
                   {user.fullName?.charAt(0) || 'A'}
                 </span>
               </div>
               <div className="text-left hidden sm:block">
-                <p className="text-sm font-medium text-gray-700">{user.fullName}</p>
-                <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                <p className="font-medium text-primary">{user.fullName}</p>
+                <p className="text-xs text-secondary capitalize">{user.role}</p>
               </div>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {showProfileMenu && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 animate-slide-up">
-                <div className="p-4 border-b border-gray-200">
-                  <p className="font-semibold text-gray-900">{user.fullName}</p>
-                  <p className="text-sm text-gray-500 mt-1">{user.email}</p>
-                  <p className="text-xs text-gray-400 mt-1 capitalize">{user.role}</p>
+              <div className="profile-dropdown">
+                <div className="profile-dropdown-header">
+                  <p className="font-semibold">{user.fullName}</p>
+                  <p className="text-sm text-secondary mt-1">{user.email}</p>
+                  <p className="text-xs text-secondary mt-1 capitalize">{user.role}</p>
                 </div>
-                <div className="py-2">
-                  <button
-                    onClick={handleProfile}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
+                <div className="profile-dropdown-actions">
+                  <button onClick={handleProfile} className="dropdown-item">
                     My Profile
                   </button>
                 </div>
-                <div className="border-t border-gray-200 py-2">
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-4 py-2 text-left text-sm text-danger-600 hover:bg-danger-50 transition-colors"
-                  >
+                <div className="dropdown-divider"></div>
+                <div className="profile-dropdown-actions">
+                  <button onClick={handleLogout} className="dropdown-item text-danger">
                     Logout
                   </button>
                 </div>
@@ -389,196 +386,183 @@ const SuperAdminDashboard = () => {
             )}
           </div>
         </div>
+      </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          <div className="card p-6 hover:shadow-lg transition-all">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 uppercase">Total Supplies</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalSupplies}</p>
-                <p className="text-sm text-primary-600 mt-2">Unique items in inventory</p>
-              </div>
-              <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">📦</span>
-              </div>
-            </div>
+      {/* KPI Cards */}
+      <div className="dashboard-cards">
+        <div className="card">
+          <div className="card-icon">
+            <span>📦</span>
           </div>
-
-          <div className="card p-6 hover:shadow-lg transition-all">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 uppercase">Total Value</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">{formatCurrency(stats.totalValue)}</p>
-                <p className="text-sm text-green-600 mt-2">Current inventory value</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">💰</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card p-6 hover:shadow-lg transition-all">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 uppercase">Active Users</p>
-                <p className="text-3xl font-bold text-purple-600 mt-2">{stats.activeUsers}</p>
-                <p className="text-sm text-purple-600 mt-2">Registered users</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">👥</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card p-6 hover:shadow-lg transition-all">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 uppercase">Pending Requests</p>
-                <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.pendingRequests}</p>
-                <p className="text-sm text-yellow-600 mt-2">Awaiting approval</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">📋</span>
-              </div>
-            </div>
+          <div className="card-content">
+            <h3>Total Supplies</h3>
+            <div className="card-value">{stats.totalSupplies}</div>
+            <div className="card-change">Unique items in inventory</div>
           </div>
         </div>
 
-        {/* Supply Trends Chart */}
-        <div className="card p-6 mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Supply Trends</h2>
-            <div className="flex space-x-2 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setTimeRange('week')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === 'week'
-                  ? 'btn-primary'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                  }`}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setTimeRange('month')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === 'month'
-                  ? 'btn-primary'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                  }`}
-              >
-                Month
-              </button>
-            </div>
+        <div className="card">
+          <div className="card-icon" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
+            <span>💰</span>
           </div>
-          {weeklyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <AreaChart data={getChartData()}>
-                <defs>
-                  <linearGradient id="colorSupplies" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#023e8a" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#023e8a" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey={timeRange === 'week' ? 'day' : 'month'} stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '0.5rem'
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="supplies"
-                  stroke="#023e8a"
-                  fillOpacity={1}
-                  fill="url(#colorSupplies)"
-                  name="Supplies"
-                />
-                <Line type="monotone" dataKey="requests" stroke="#10B981" name="Requests" />
-                <Line type="monotone" dataKey="approvals" stroke="#F59E0B" name="Approvals" />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
-              No data available for the selected period
-            </div>
-          )}
+          <div className="card-content">
+            <h3>Total Value</h3>
+            <div className="card-value" style={{ color: '#22c55e' }}>{formatCurrency(stats.totalValue)}</div>
+            <div className="card-change">Current inventory value</div>
+          </div>
         </div>
 
-        {/* Recent Activities */}
-        <div className="card p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activities</h2>
-          {recentActivities.length > 0 ? (
-            <div className="space-y-4">
-              {recentActivities.map(activity => (
-                <div key={activity.id} className="flex items-center justify-between border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm
-                      ${activity.type === 'request' ? 'bg-blue-100 text-blue-600' : ''}
-                      ${activity.type === 'approve' ? 'bg-green-100 text-green-600' : ''}
-                      ${activity.type === 'update' ? 'bg-yellow-100 text-yellow-600' : ''}
-                    `}>
+        <div className="card">
+          <div className="card-icon" style={{ background: 'rgba(168, 85, 247, 0.1)' }}>
+            <span>👥</span>
+          </div>
+          <div className="card-content">
+            <h3>Active Users</h3>
+            <div className="card-value" style={{ color: '#a855f7' }}>{stats.activeUsers}</div>
+            <div className="card-change">Registered users</div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-icon" style={{ background: 'rgba(234, 179, 8, 0.1)' }}>
+            <span>📋</span>
+          </div>
+          <div className="card-content">
+            <h3>Pending Requests</h3>
+            <div className="card-value" style={{ color: '#eab308' }}>{stats.pendingRequests}</div>
+            <div className="card-change">Awaiting approval</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Supply Trends Chart */}
+      <div className="dashboard-section" style={{ marginBottom: '2rem' }}>
+        <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+          <h2>Supply Trends</h2>
+          <div className="flex gap-2" style={{ background: '#f1f5f9', borderRadius: '0.5rem', padding: '0.25rem' }}>
+            <button
+              onClick={() => setTimeRange('week')}
+              className={`btn ${timeRange === 'week' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setTimeRange('month')}
+              className={`btn ${timeRange === 'month' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+            >
+              Month
+            </button>
+          </div>
+        </div>
+        {weeklyData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={400}>
+            <AreaChart data={getChartData()}>
+              <defs>
+                <linearGradient id="colorSupplies" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#023e8a" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#023e8a" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey={timeRange === 'week' ? 'day' : 'month'} stroke="#6B7280" />
+              <YAxis stroke="#6B7280" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '0.5rem'
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="supplies"
+                stroke="#023e8a"
+                fillOpacity={1}
+                fill="url(#colorSupplies)"
+                name="Supplies"
+              />
+              <Line type="monotone" dataKey="requests" stroke="#10B981" name="Requests" />
+              <Line type="monotone" dataKey="approvals" stroke="#F59E0B" name="Approvals" />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex-center" style={{ height: '400px' }}>
+            <p className="text-secondary">No data available for the selected period</p>
+          </div>
+        )}
+      </div>
+
+      {/* Recent Activities */}
+      <div className="dashboard-section" style={{ marginBottom: '2rem' }}>
+        <h2>Recent Activities</h2>
+        {recentActivities.length > 0 ? (
+          <div className="space-y-4">
+            {recentActivities.map(activity => (
+              <div key={activity.id} className="flex-between border-bottom pb-4">
+                <div className="flex-center gap-3">
+                  <div className={`card-icon`} style={{ width: '32px', height: '32px', background: activity.type === 'request' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(34, 197, 94, 0.1)' }}>
+                    <span style={{ fontSize: '1rem' }}>
                       {activity.type === 'request' && '📝'}
                       {activity.type === 'approve' && '✅'}
                       {activity.type === 'update' && '🔄'}
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-900">
-                        <span className="font-medium">{activity.user}</span> {activity.action} {activity.item}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-                    </div>
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-medium">{activity.user} {activity.action} {activity.item}</p>
+                    <p className="text-secondary text-sm mt-1">{activity.time}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="h-48 flex items-center justify-center text-gray-500">
-              No recent activities
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex-center" style={{ height: '200px' }}>
+            <p className="text-secondary">No recent activities</p>
+          </div>
+        )}
+      </div>
 
-        {/* Pending Requests Table */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Pending Requests</h2>
-          {pendingRequests.length > 0 ? (
-            <div className="table-wrapper">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Requester</th>
-                    <th>Item</th>
-                    <th>Priority</th>
-                    <th>Date</th>
+      {/* Pending Requests Table */}
+      <div className="dashboard-section">
+        <h2>Pending Requests</h2>
+        {pendingRequests.length > 0 ? (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Requester</th>
+                  <th>Item</th>
+                  <th>Priority</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingRequests.map(request => (
+                  <tr
+                    key={request.id}
+                    onClick={() => navigate(`/requisitions/${request.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td className="font-medium">{request.requester}</td>
+                    <td className="text-secondary">{request.item}</td>
+                    <td>
+                      <span className={`badge badge-${request.priority}`}>
+                        {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
+                      </span>
+                    </td>
+                    <td className="text-secondary">{request.date}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {pendingRequests.map(request => (
-                    <tr
-                      key={request.id}
-                      onClick={() => navigate(`/requisitions/${request.id}`)}
-                    >
-                      <td className="font-medium text-gray-900">{request.requester}</td>
-                      <td className="text-gray-600">{request.item}</td>
-                      <td>
-                        <span className={`priority-${request.priority}`}>
-                          {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
-                        </span>
-                      </td>
-                      <td className="text-gray-600">{request.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-center py-8 text-gray-500">No pending requests</p>
-          )}
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex-center" style={{ height: '200px' }}>
+            <p className="text-secondary">No pending requests</p>
+          </div>
+        )}
       </div>
     </div>
   );

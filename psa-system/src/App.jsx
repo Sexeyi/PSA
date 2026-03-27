@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './Components/Sidebar'
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard'
@@ -10,7 +10,6 @@ import RequestApproval from './pages/superadmin/RequestApproval'
 import Profile from './Components/Profile'
 import Login from './pages/auth/Login'
 import SignIn from './pages/auth/SignIn'
-import Navbar from './Components/Navbar'
 import UserManagement from './pages/superadmin/UserManagement'
 import MyRequests from './pages/employee/MyRequests'
 import InventoryTable from './pages/admin/InventoryTable'
@@ -101,12 +100,6 @@ function MainContent({
         backgroundColor: '#f8f9fa',
         minHeight: '100vh'
       }}>
-        <Navbar
-          user={user}
-          onLogout={handleLogout}
-          onViewChange={setCurrentView}
-          menuItems={menuItems}
-        />
         <div style={{ padding: '20px' }}>
           {renderContent()}
         </div>
