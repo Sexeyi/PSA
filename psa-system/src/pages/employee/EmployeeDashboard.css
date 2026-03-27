@@ -1,20 +1,21 @@
-/* EmployeeDashboard.css - Matching SuperAdminDashboard Style */
+/* EmployeeDashboard.css */
 
-/* Dashboard Container */
+/* Dashboard Container - Takes full width of main content area */
 .employee-dashboard {
-    background: #f8fafc;
+    width: 100%;
     min-height: 100vh;
+    background: #f8fafc;
     padding: 2rem;
-    transition: margin-left 0.3s ease, width 0.3s ease;
 }
 
-@media (max-width: 1920px) {
+/* Responsive padding */
+@media (max-width: 768px) {
     .employee-dashboard {
         padding: 1rem;
     }
 }
 
-/* Dashboard Header - Same as SuperAdmin */
+/* Dashboard Header */
 .dashboard-header {
     margin-bottom: 2rem;
 }
@@ -31,7 +32,7 @@
     font-size: 1rem;
 }
 
-/* Profile Dropdown - Same as SuperAdmin */
+/* Profile Dropdown */
 .profile-menu {
     position: relative;
 }
@@ -91,7 +92,7 @@
     background: rgba(239, 68, 68, 0.1);
 }
 
-/* Dashboard Cards - 30% White Surfaces */
+/* Dashboard Cards */
 .dashboard-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -166,7 +167,7 @@
     }
 }
 
-/* Dashboard Section - Same as SuperAdmin */
+/* Dashboard Section */
 .dashboard-section {
     background: white;
     border-radius: 1rem;
@@ -325,7 +326,7 @@
     margin-top: 1rem;
 }
 
-/* Table Styles - Same as SuperAdmin */
+/* Table Styles */
 .table-wrapper {
     overflow-x: auto;
     border-radius: 0.75rem;
@@ -744,11 +745,6 @@
 
 .p-5 {
     padding: 1.25rem;
-}
-
-.py-6 {
-    padding-top: 1.5rem;
-    padding-bottom: 1.5rem;
 }
 
 .cursor-pointer {

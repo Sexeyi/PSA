@@ -74,12 +74,6 @@ const IconTrendingDown = () => (
     </svg>
 );
 
-const IconUser = () => (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-);
-
 const daysAgoLabel = (date) => {
     if (!date) return "N/A";
     const today = new Date();
@@ -119,31 +113,6 @@ export default function EmployeeDashboard() {
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [viewMode, setViewMode] = useState("list");
-    const [sidebarWidth, setSidebarWidth] = useState(0);
-
-    // Detect sidebar width
-    useEffect(() => {
-        const updateSidebarWidth = () => {
-            const sidebar = document.querySelector('.sidebar, .side-menu, [class*="sidebar"], [class*="side-menu"]');
-            if (sidebar) {
-                const width = sidebar.offsetWidth;
-                setSidebarWidth(width);
-            } else {
-                setSidebarWidth(0);
-            }
-        };
-
-        updateSidebarWidth();
-        window.addEventListener('resize', updateSidebarWidth);
-
-        const observer = new MutationObserver(updateSidebarWidth);
-        observer.observe(document.body, { childList: true, subtree: true });
-
-        return () => {
-            window.removeEventListener('resize', updateSidebarWidth);
-            observer.disconnect();
-        };
-    }, []);
 
     // Get user data
     useEffect(() => {
@@ -364,7 +333,7 @@ export default function EmployeeDashboard() {
 
     if (loading) {
         return (
-            <div className="employee-dashboard" style={{ marginLeft: sidebarWidth }}>
+            <div className="employee-dashboard">
                 <div className="flex-center" style={{ minHeight: '100vh' }}>
                     <div className="text-center">
                         <div className="spinner-lg"></div>
@@ -377,7 +346,7 @@ export default function EmployeeDashboard() {
 
     if (error) {
         return (
-            <div className="employee-dashboard" style={{ marginLeft: sidebarWidth }}>
+            <div className="employee-dashboard">
                 <div className="flex-center" style={{ minHeight: '100vh' }}>
                     <div className="text-center">
                         <div className="text-danger" style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
@@ -393,7 +362,7 @@ export default function EmployeeDashboard() {
     }
 
     return (
-        <div className="employee-dashboard" style={{ marginLeft: sidebarWidth, width: `calc(100% - ${sidebarWidth}px)` }}>
+        <div className="employee-dashboard">
             <div className="dashboard-header">
                 <div className="flex-between">
                     <div>
