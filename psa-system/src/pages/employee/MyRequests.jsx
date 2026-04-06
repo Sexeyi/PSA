@@ -1,239 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
-// shadcn/ui inspired components with Tailwind v4
-const Input = ({ label, error, icon, className = "", ...props }) => (
-    <div className="space-y-2">
-        {label && (
-            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                {label}
-            </label>
-        )}
-        <div className="relative">
-            {icon && (
-                <div className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    {icon}
-                </div>
-            )}
-            <input
-                className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${error ? "border-red-500 focus-visible:ring-red-500" : ""
-                    } ${icon ? "ps-10" : ""} ${className}`}
-                {...props}
-            />
-        </div>
-        {error && <p className="text-sm text-red-500">{error}</p>}
-    </div>
-);
-
-const Select = ({ label, options, error, className = "", ...props }) => (
-    <div className="space-y-2">
-        {label && (
-            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                {label}
-            </label>
-        )}
-        <select
-            className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${error ? "border-red-500" : ""
-                } ${className}`}
-            {...props}
-        >
-            <option value="">Select unit</option>
-            {options.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-        </select>
-        {error && <p className="text-sm text-red-500">{error}</p>}
-    </div>
-);
-
-const Textarea = ({ label, error, className = "", ...props }) => (
-    <div className="space-y-2">
-        {label && (
-            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                {label}
-            </label>
-        )}
-        <textarea
-            className={`flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${error ? "border-red-500" : ""
-                } ${className}`}
-            {...props}
-        />
-        {error && <p className="text-sm text-red-500">{error}</p>}
-    </div>
-);
-
-const Button = ({ children, variant = "default", size = "default", loading, className = "", ...props }) => {
-    const baseStyles = "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
-
-    const variants = {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-    };
-
-    const sizes = {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
-    };
-
-    return (
-        <button
-            className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
-            disabled={loading}
-            {...props}
-        >
-            {loading && (
-                <svg className="animate-spin -ms-1 me-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-            )}
-            {children}
-        </button>
-    );
-};
-
-const Card = ({ children, className = "" }) => (
-    <div className={`rounded-lg border bg-card text-card-foreground shadow-sm ${className}`}>
-        {children}
-    </div>
-);
-
-const CardHeader = ({ children, className = "" }) => (
-    <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>
-        {children}
-    </div>
-);
-
-const CardTitle = ({ children, className = "" }) => (
-    <h3 className={`text-lg font-semibold leading-none tracking-tight ${className}`}>
-        {children}
-    </h3>
-);
-
-const CardDescription = ({ children, className = "" }) => (
-    <p className={`text-sm text-muted-foreground ${className}`}>
-        {children}
-    </p>
-);
-
-const CardContent = ({ children, className = "" }) => (
-    <div className={`p-6 pt-0 ${className}`}>
-        {children}
-    </div>
-);
-
-const CardFooter = ({ children, className = "" }) => (
-    <div className={`flex items-center p-6 pt-0 ${className}`}>
-        {children}
-    </div>
-);
-
-const Badge = ({ children, variant = "default", className = "" }) => {
-    const variants = {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground border border-input",
-        success: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
-        warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
-    };
-
-    return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${variants[variant]} ${className}`}>
-            {children}
-        </span>
-    );
-};
-
-const Table = ({ children, className = "" }) => (
-    <div className={`relative w-full overflow-auto ${className}`}>
-        <table className="w-full caption-bottom text-sm">
-            {children}
-        </table>
-    </div>
-);
-
-const TableHeader = ({ children, className = "" }) => (
-    <thead className={`[&_tr]:border-b ${className}`}>
-        {children}
-    </thead>
-);
-
-const TableBody = ({ children, className = "" }) => (
-    <tbody className={`[&_tr:last-child]:border-0 ${className}`}>
-        {children}
-    </tbody>
-);
-
-const TableRow = ({ children, className = "", ...props }) => (
-    <tr className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${className}`} {...props}>
-        {children}
-    </tr>
-);
-
-const TableHead = ({ children, className = "" }) => (
-    <th className={`h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 ${className}`}>
-        {children}
-    </th>
-);
-
-const TableCell = ({ children, className = "" }) => (
-    <td className={`p-4 align-middle [&:has([role=checkbox])]:pr-0 ${className}`}>
-        {children}
-    </td>
-);
-
-// Icons
-const Icons = {
-    Plus: () => (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-    ),
-    Trash: () => (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-    ),
-    Package: () => (
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-    ),
-    Currency: () => (
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-    ),
-    Search: () => (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-    ),
-    Refresh: () => (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-    ),
-};
-
-const unitOptions = [
-    { value: "piece", label: "Piece" },
-    { value: "roll", label: "Roll" },
-    { value: "ream", label: "Ream" },
-    { value: "box", label: "Box" },
-    { value: "book", label: "Book" },
-    { value: "pack", label: "Pack" },
-    { value: "set", label: "Set" },
-    { value: "bottle", label: "Bottle" },
-    { value: "toner", label: "Toner" }
-];
+import "./MyRequests.css";
 
 const MyRequests = () => {
     const [notes, setNotes] = useState("");
@@ -250,6 +17,8 @@ const MyRequests = () => {
     const [submitting, setSubmitting] = useState(false);
     const [inventoryItems, setInventoryItems] = useState([]);
     const [loadingInventory, setLoadingInventory] = useState(false);
+    const [successMessage, setSuccessMessage] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
 
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -343,7 +112,7 @@ const MyRequests = () => {
         }
     };
 
-    const calculateGrandTotal = () => {
+    const calculateOverallTotal = () => {
         return items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
     };
 
@@ -370,11 +139,14 @@ const MyRequests = () => {
         });
 
         if (!isValid) {
-            alert("Please fix the errors before submitting");
+            setErrorMessage("Please fix the errors before submitting");
+            setTimeout(() => setErrorMessage(""), 5000);
             return;
         }
 
         setSubmitting(true);
+        setErrorMessage("");
+        setSuccessMessage("");
 
         try {
             const token = localStorage.getItem("token");
@@ -388,7 +160,7 @@ const MyRequests = () => {
                     totalPrice: item.totalPrice
                 })),
                 notes,
-                grandTotal: calculateGrandTotal()
+                overallTotal: calculateOverallTotal()
             };
 
             await axios.post(
@@ -397,7 +169,7 @@ const MyRequests = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            alert("✅ Requisition submitted successfully!");
+            setSuccessMessage("✅ Requisition submitted successfully!");
 
             setItems([{
                 id: 1,
@@ -411,9 +183,12 @@ const MyRequests = () => {
             }]);
             setNotes("");
 
+            setTimeout(() => setSuccessMessage(""), 5000);
+
         } catch (error) {
             console.error(error);
-            alert(error.response?.data?.message || "Error submitting requisition");
+            setErrorMessage(error.response?.data?.message || "Error submitting requisition");
+            setTimeout(() => setErrorMessage(""), 5000);
         } finally {
             setSubmitting(false);
         }
@@ -437,68 +212,76 @@ const MyRequests = () => {
 
     if (loadingInventory) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                    <p className="mt-4 text-muted-foreground">Loading inventory...</p>
-                </div>
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p className="loading-text">Loading inventory...</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8 max-w-7xl">
+        <div className="requests-container">
+            <div className="requests-wrapper">
                 {/* Header */}
-                <div className="mb-8 animate-fade-in">
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                        Create New Requisition
-                    </h1>
-                    <p className="text-muted-foreground mt-2">
+                <div className="requests-header">
+                    <h1 className="requests-title">Create New Requisition</h1>
+                    <p className="requests-subtitle">
                         Fill out the form below to submit your request for approval
                     </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Messages */}
+                {successMessage && (
+                    <div className="alert alert-success">
+                        <span className="alert-icon">✓</span>
+                        <span>{successMessage}</span>
+                    </div>
+                )}
+
+                {errorMessage && (
+                    <div className="alert alert-error">
+                        <span className="alert-icon">⚠</span>
+                        <span>{errorMessage}</span>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="requests-form">
                     {/* Items Card */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Request Items</CardTitle>
-                            <CardDescription>
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">Request Items</h3>
+                            <p className="card-description">
                                 Add the items you need to request. Unit prices are automatically populated from inventory.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="min-w-[280px]">Item Name <span className="text-red-500">*</span></TableHead>
-                                            <TableHead className="min-w-[120px]">Quantity <span className="text-red-500">*</span></TableHead>
-                                            <TableHead className="min-w-[120px]">Unit <span className="text-red-500">*</span></TableHead>
-                                            <TableHead className="min-w-[100px]">Unit Price</TableHead>
-                                            <TableHead className="min-w-[100px]">Total</TableHead>
-                                            <TableHead className="w-[50px]"></TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
+                            </p>
+                        </div>
+                        <div className="card-content">
+                            <div className="table-container">
+                                <table className="requests-table">
+                                    <thead>
+                                        <tr>
+                                            <th className="item-name-col">Item Name <span className="required">*</span></th>
+                                            <th className="quantity-col">Quantity <span className="required">*</span></th>
+                                            <th className="unit-col">Unit <span className="required">*</span></th>
+                                            <th className="price-col">Unit Price</th>
+                                            <th className="total-col">Total</th>
+                                            <th className="actions-col"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                         {items.map((item, index) => (
-                                            <TableRow key={item.id}>
-                                                <TableCell>
-                                                    <div className="relative">
-                                                        <div className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                                                            <Icons.Search />
-                                                        </div>
+                                            <tr key={item.id}>
+                                                <td>
+                                                    <div className="search-input-wrapper">
                                                         <input
                                                             type="text"
                                                             list={`inventory-list-${index}`}
                                                             value={item.itemName}
                                                             onChange={(e) => handleItemChange(index, "itemName", e.target.value)}
-                                                            className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ps-10 ${item.errors.itemName ? "border-red-500" : ""
-                                                                }`}
+                                                            className={`form-input ${item.errors.itemName ? 'error' : ''}`}
                                                             placeholder="Search inventory..."
                                                             autoComplete="off"
                                                         />
+                                                        <span className="search-icon">🔍</span>
                                                         <datalist id={`inventory-list-${index}`}>
                                                             {inventoryItems.map(invItem => (
                                                                 <option key={invItem._id} value={invItem.name || invItem.itemName}>
@@ -508,160 +291,148 @@ const MyRequests = () => {
                                                         </datalist>
                                                     </div>
                                                     {item.errors.itemName && (
-                                                        <p className="text-sm text-red-500 mt-1">{item.errors.itemName}</p>
+                                                        <p className="error-text">{item.errors.itemName}</p>
                                                     )}
-                                                </TableCell>
-                                                <TableCell>
+                                                </td>
+                                                <td>
                                                     <input
                                                         type="number"
                                                         min="1"
                                                         step="1"
                                                         value={item.quantity}
                                                         onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                                                        className={`flex h-10 w-full max-w-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${item.errors.quantity ? "border-red-500" : ""
-                                                            }`}
+                                                        className={`form-input quantity-input ${item.errors.quantity ? 'error' : ''}`}
                                                         placeholder="0"
                                                     />
                                                     {item.errors.quantity && (
-                                                        <p className="text-sm text-red-500 mt-1">{item.errors.quantity}</p>
+                                                        <p className="error-text">{item.errors.quantity}</p>
                                                     )}
-                                                </TableCell>
-                                                <TableCell>
+                                                </td>
+                                                <td>
                                                     <select
                                                         value={item.unit}
                                                         onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                                                        className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${item.errors.unit ? "border-red-500" : ""
-                                                            }`}
+                                                        className={`form-select ${item.errors.unit ? 'error' : ''}`}
                                                     >
                                                         <option value="">Select unit</option>
-                                                        {unitOptions.map(opt => (
-                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                        ))}
+                                                        <option value="piece">Piece</option>
+                                                        <option value="roll">Roll</option>
+                                                        <option value="ream">Ream</option>
+                                                        <option value="box">Box</option>
+                                                        <option value="book">Book</option>
+                                                        <option value="pack">Pack</option>
+                                                        <option value="set">Set</option>
+                                                        <option value="bottle">Bottle</option>
+                                                        <option value="toner">Toner</option>
                                                     </select>
                                                     {item.errors.unit && (
-                                                        <p className="text-sm text-red-500 mt-1">{item.errors.unit}</p>
+                                                        <p className="error-text">{item.errors.unit}</p>
                                                     )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-sm font-medium">{formatCurrency(item.unitPrice)}</span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-sm font-semibold text-primary">{formatCurrency(item.totalPrice)}</span>
-                                                </TableCell>
-                                                <TableCell>
+                                                </td>
+                                                <td className="price-cell">
+                                                    {formatCurrency(item.unitPrice)}
+                                                </td>
+                                                <td className="total-cell">
+                                                    {formatCurrency(item.totalPrice)}
+                                                </td>
+                                                <td className="actions-cell">
                                                     {items.length > 1 && (
                                                         <button
                                                             type="button"
                                                             onClick={() => removeItem(index)}
-                                                            className="text-muted-foreground hover:text-destructive transition-colors"
+                                                            className="remove-btn"
                                                             title="Remove item"
                                                         >
-                                                            <Icons.Trash />
+                                                            🗑️
                                                         </button>
                                                     )}
-                                                </TableCell>
-                                            </TableRow>
+                                                </td>
+                                            </tr>
                                         ))}
-                                    </TableBody>
-                                </Table>
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <div className="mt-4 pt-4 border-t">
-                                <Button type="button" variant="outline" onClick={addItem}>
-                                    <Icons.Plus className="me-2" />
+                            <div className="add-item-section">
+                                <button type="button" className="btn-outline" onClick={addItem}>
+                                    <span className="btn-icon">+</span>
                                     Add Another Item
-                                </Button>
+                                </button>
                             </div>
 
                             {/* Summary Row */}
-                            <div className="mt-4 flex justify-end">
-                                <div className="bg-muted/50 rounded-lg p-4 min-w-[250px]">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm font-medium">Grand Total:</span>
-                                        <span className="text-lg font-bold text-primary">{formatCurrency(calculateGrandTotal())}</span>
-                                    </div>
+                            <div className="summary-section">
+                                <div className="summary-card">
+                                    <div className="summary-label">Overall Total:</div>
+                                    <div className="summary-value">{formatCurrency(calculateOverallTotal())}</div>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
                     {/* Notes Card */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Additional Notes</CardTitle>
-                            <CardDescription>Any special instructions or comments</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Textarea
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">Additional Notes</h3>
+                            <p className="card-description">Any special instructions or comments</p>
+                        </div>
+                        <div className="card-content">
+                            <textarea
+                                className="form-textarea"
                                 placeholder="Enter any additional notes or special requirements here..."
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 rows={4}
                             />
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-primary/10 rounded-lg p-3">
-                                        <Icons.Package />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Total Items</p>
-                                        <p className="text-2xl font-bold">{items.length}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-primary/10 rounded-lg p-3">
-                                        <Icons.Package />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Total Quantity</p>
-                                        <p className="text-2xl font-bold">{calculateTotalQuantity()}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-primary/10 rounded-lg p-3">
-                                        <Icons.Currency />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Grand Total</p>
-                                        <p className="text-2xl font-bold text-primary">{formatCurrency(calculateGrandTotal())}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <div className="stat-icon">📦</div>
+                            <div>
+                                <p className="stat-label">Total Items</p>
+                                <p className="stat-value">{items.length}</p>
+                            </div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-icon">📊</div>
+                            <div>
+                                <p className="stat-label">Total Quantity</p>
+                                <p className="stat-value">{calculateTotalQuantity()}</p>
+                            </div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-icon">💰</div>
+                            <div>
+                                <p className="stat-label">Overall Total</p>
+                                <p className="stat-value stat-value-primary">{formatCurrency(calculateOverallTotal())}</p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Form Actions */}
-                    <div className="flex justify-end gap-3">
-                        <Button type="button" variant="outline" onClick={handleClear}>
+                    <div className="form-actions">
+                        <button type="button" className="btn-secondary" onClick={handleClear}>
                             Clear Form
-                        </Button>
-                        <Button type="submit" loading={submitting}>
-                            {submitting ? "Submitting..." : "Submit Requisition"}
-                        </Button>
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={submitting}>
+                            {submitting ? (
+                                <>
+                                    <span className="spinner-small"></span>
+                                    Submitting...
+                                </>
+                            ) : (
+                                'Submit Requisition'
+                            )}
+                        </button>
                     </div>
 
                     {/* Help Text */}
-                    <div className="text-center space-y-1">
-                        <p className="text-xs text-muted-foreground">
-                            Fields marked with <span className="text-red-500">*</span> are required.
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            Your request will be reviewed by the approver before processing.
-                        </p>
+                    <div className="help-text">
+                        <p>Fields marked with <span className="required-text">*</span> are required.</p>
+                        <p>Your request will be reviewed by the approver before processing.</p>
                     </div>
                 </form>
             </div>

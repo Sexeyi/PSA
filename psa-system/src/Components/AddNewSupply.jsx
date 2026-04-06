@@ -84,7 +84,7 @@ const AddNewSupply = ({ isOpen, onClose, onSupplyAdded }) => {
       if (!response.ok) {
         throw new Error(responseData.message || 'Failed to add supply');
       }
-
+      
       console.log('Supply added successfully:', responseData);
 
       // Reset form

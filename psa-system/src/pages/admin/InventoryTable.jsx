@@ -486,7 +486,6 @@ const InventoryTable = () => {
             disabled={uploadLoading}
             className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
           >
-            <span className="text-lg">📤</span>
             {uploadLoading ? 'Uploading...' : 'Upload Excel'}
           </button>
 

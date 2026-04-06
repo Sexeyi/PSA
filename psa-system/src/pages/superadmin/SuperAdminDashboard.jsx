@@ -4,7 +4,6 @@ import {
   LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import './SuperAdminDashboard.css';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();

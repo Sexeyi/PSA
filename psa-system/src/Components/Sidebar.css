@@ -1,76 +1,167 @@
+/* Sidebar.css - Updated for shadcn icons */
+
 .sidebar {
-  width: 250px;
-  background: #1e293b;
-  color: white;
-  height: screen;
+  width: 260px;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  color: #e2e8f0;
+  height: 100vh;
   position: fixed;
   left: 0;
   top: 0;
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  z-index: 50;
+  transition: all 0.3s ease;
 }
 
 .psa-logo-container {
-  padding: 20px;
-  
+  padding: 1.5rem;
   text-align: center;
   border-bottom: 1px solid #334155;
+  margin-bottom: 1rem;
 }
 
 .psa-logo {
-  width: 120px;
+  width: 140px;
   height: auto;
+  margin: auto
 }
 
 .sidebar-menu {
   list-style: none;
-  padding: 20px 0;
+  padding: 0.5rem 0.75rem;
   margin: 0;
   flex: 1;
 }
 
 .sidebar-menu li {
-  padding: 12px 24px;
+  padding: 0.625rem 0.875rem;
+  margin: 0.25rem 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s ease;
   color: #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .sidebar-menu li:hover {
-  background: #334155;
+  background: rgba(51, 65, 85, 0.6);
   color: white;
 }
 
 .sidebar-menu li.active {
-  background: #2563eb;
+  background: #023e8a;
   color: white;
-  border-left: 4px solid #60a5fa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-menu li.active .menu-icon {
+  color: white;
 }
 
 .menu-icon {
-  font-size: 18px;
-  width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: #94a3b8;
+  transition: color 0.2s ease;
+}
+
+.sidebar-menu li:hover .menu-icon {
+  color: white;
+}
+
+.sidebar-menu li.active .menu-icon {
+  color: white;
 }
 
 .menu-text {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
+  flex: 1;
 }
 
 .sidebar-footer {
-  padding: 16px 24px;
+  padding: 1rem 1.25rem;
   border-top: 1px solid #334155;
-  font-size: 12px;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  margin-top: auto;
 }
 
 .user-role {
   display: block;
   text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  background: rgba(51, 65, 85, 0.5);
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+}
+
+/* Scrollbar styling */
+.sidebar-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Responsive sidebar */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* Optional: Collapsed sidebar state */
+.sidebar.collapsed {
+  width: 72px;
+}
+
+.sidebar.collapsed .menu-text {
+  display: none;
+}
+
+.sidebar.collapsed .psa-logo {
+  width: 40px;
+}
+
+.sidebar.collapsed .user-role {
+  font-size: 0.625rem;
+  padding: 0.25rem;
+  word-break: break-word;
+}
+
+.sidebar.collapsed .sidebar-menu li {
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.sidebar.collapsed .menu-icon {
+  width: 24px;
+  height: 24px;
 }

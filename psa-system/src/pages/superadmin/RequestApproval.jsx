@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './RequestApproval.css';
 
 const RequestApproval = () => {
     const navigate = useNavigate();
@@ -190,7 +191,7 @@ const RequestApproval = () => {
             setSelectedRequest(null);
             setRemarks('');
 
-            alert('✅ Requisition approved successfully! It is now ready for Admin to issue.');
+            alert('Requisition approved successfully! It is now ready for Admin to issue.');
         } catch (error) {
             console.error('Error approving requisition:', error);
             alert(error.message);
@@ -231,7 +232,7 @@ const RequestApproval = () => {
             setSelectedRequest(null);
             setRemarks('');
 
-            alert('❌ Requisition rejected successfully!');
+            alert('Requisition rejected successfully!');
         } catch (error) {
             console.error('Error rejecting requisition:', error);
             alert(error.message);
@@ -303,103 +304,87 @@ const RequestApproval = () => {
 
     if (loading && requisitions.length === 0) {
         return (
-            <div className="min-h-screen bg-linear-to-br from-gray-50 to-white flex items-center justify-center">
-                <div className="text-center">
-                    <div className="spinner-lg"></div>
-                    <p className="mt-4 text-gray-600 font-medium">Loading requisitions...</p>
+            <div className="loading-container">
+                <div className="loading-content">
+                    <div className="spinner-large"></div>
+                    <p className="loading-text">Loading requisitions...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-linear-to-br from-gray-50 to-white">
-            <div className="container-custom py-8">
+        <div className="request-approval-container">
+            <div className="request-approval-wrapper">
                 {/* Header */}
-                <div className="mb-8 animate-fade-in">
-                    <h1 className="gradient-text">SuperAdmin - Request Approval</h1>
-                    <p className="text-gray-600 mt-2">
+                <div className="request-header">
+                    <h1 className="request-title">Request Approval</h1>
+                    <p className="request-subtitle">
                         Review and approve pending requisitions. Approved requests will be queued for Admin to issue.
                     </p>
                     {user && (
-                        <div className="mt-3 flex items-center gap-2 text-sm text-gray-500 bg-white px-3 py-1 rounded-lg border border-gray-200">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
+                        <div className="user-info-badge">
                             <span>Logged in as: <strong>{user.fullName}</strong> (Role: {user.role})</span>
                         </div>
                     )}
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-                    <div className="card p-5">
-                        <div className="flex items-center justify-between">
+                <div className="stats-grid">
+                    <div className="stat-card">
+                        <div className="stat-content">
                             <div>
-                                <p className="text-sm text-gray-500 mb-1">Pending</p>
-                                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                                <p className="stat-label">Pending</p>
+                                <p className="stat-value stat-value-pending">{stats.pending}</p>
                             </div>
-                            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                                <span className="text-xl">⏳</span>
-                            </div>
+                            <div className={`stat-decoration stat-decoration-pending`}></div>
                         </div>
                     </div>
-                    <div className="card p-5">
-                        <div className="flex items-center justify-between">
+                    <div className="stat-card">
+                        <div className="stat-content">
                             <div>
-                                <p className="text-sm text-gray-500 mb-1">Approved</p>
-                                <p className="text-2xl font-bold text-blue-600">{stats.approved}</p>
+                                <p className="stat-label">Approved</p>
+                                <p className="stat-value stat-value-approved">{stats.approved}</p>
                             </div>
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <span className="text-xl">✅</span>
-                            </div>
+                            <div className={`stat-decoration stat-decoration-approved`}></div>
                         </div>
                     </div>
-                    <div className="card p-5">
-                        <div className="flex items-center justify-between">
+                    <div className="stat-card">
+                        <div className="stat-content">
                             <div>
-                                <p className="text-sm text-gray-500 mb-1">Rejected</p>
-                                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+                                <p className="stat-label">Rejected</p>
+                                <p className="stat-value stat-value-rejected">{stats.rejected}</p>
                             </div>
-                            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                                <span className="text-xl">❌</span>
-                            </div>
+                            <div className={`stat-decoration stat-decoration-rejected`}></div>
                         </div>
                     </div>
-                    <div className="card p-5">
-                        <div className="flex items-center justify-between">
+                    <div className="stat-card">
+                        <div className="stat-content">
                             <div>
-                                <p className="text-sm text-gray-500 mb-1">Issued</p>
-                                <p className="text-2xl font-bold text-green-600">{stats.issued}</p>
+                                <p className="stat-label">Issued</p>
+                                <p className="stat-value stat-value-issued">{stats.issued}</p>
                             </div>
-                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                <span className="text-xl">📦</span>
-                            </div>
+                            <div className={`stat-decoration stat-decoration-issued`}></div>
                         </div>
                     </div>
                 </div>
 
                 {/* Filters and Search */}
-                <div className="card p-5 mb-6">
-                    <div className="flex flex-wrap gap-4">
-                        <div className="flex-1 min-w-50">
-                            <div className="relative">
-                                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                <input
-                                    type="text"
-                                    placeholder="Search by requester, department, or item..."
-                                    value={searchTerm}
-                                    onChange={(e) => {
-                                        setSearchTerm(e.target.value);
-                                        setCurrentPage(1);
-                                    }}
-                                    className="input pl-10"
-                                />
-                            </div>
+                <div className="filters-card">
+                    <div className="filters-wrapper">
+                        <div className="search-wrapper">
+                            <input
+                                type="text"
+                                placeholder="Search by requester, department, or item..."
+                                value={searchTerm}
+                                onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="search-input"
+                            />
                         </div>
-                        <div className="flex gap-2">
+                        <div className="filter-buttons">
                             {['pending', 'approved', 'rejected', 'issued', 'all'].map(status => (
                                 <button
                                     key={status}
@@ -407,9 +392,9 @@ const RequestApproval = () => {
                                         setFilterStatus(status);
                                         setCurrentPage(1);
                                     }}
-                                    className={`btn ${filterStatus === status ? 'btn-primary' : 'btn-secondary'}`}
+                                    className={`filter-btn ${filterStatus === status ? 'filter-btn-active' : ''}`}
                                 >
-                                    {status === 'all' ? 'All' : status}
+                                    {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
                                 </button>
                             ))}
                         </div>
@@ -418,31 +403,29 @@ const RequestApproval = () => {
 
                 {/* Error Message */}
                 {error && (
-                    <div className="mb-6 bg-red-50 text-red-800 p-4 rounded-lg border border-red-200">
-                        ⚠️ {error}
+                    <div className="error-message">
+                        Error: {error}
                     </div>
                 )}
 
                 {/* Requisitions Table */}
-                <div className="card overflow-hidden">
-                    <div className="px-6 py-4 bg-linear-to-r from-gray-50 to-white border-b border-gray-200">
-                        <h2 className="font-semibold text-gray-900">
-                            Requisitions ({filteredRequisitions.length})
-                        </h2>
+                <div className="table-card">
+                    <div className="table-header">
+                        <h2>Requisitions ({filteredRequisitions.length})</h2>
                     </div>
 
                     {filteredRequisitions.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <div className="text-5xl mb-4">📭</div>
-                            <h3 className="text-xl font-medium text-gray-900 mb-2">No Requisitions Found</h3>
-                            <p className="text-gray-600">
+                        <div className="empty-state">
+                            <div className="empty-state-icon">📋</div>
+                            <h3 className="empty-state-title">No Requisitions Found</h3>
+                            <p className="empty-state-text">
                                 {searchTerm ? 'Try adjusting your search or filters' : 'No requisitions match the selected status'}
                             </p>
                         </div>
                     ) : (
                         <>
                             <div className="table-wrapper">
-                                <table className="table">
+                                <table className="data-table">
                                     <thead>
                                         <tr>
                                             <th>Requester</th>
@@ -463,48 +446,47 @@ const RequestApproval = () => {
                                             return (
                                                 <tr
                                                     key={req._id}
-                                                    className="cursor-pointer hover:bg-gray-50 transition-colors"
                                                     onClick={() => {
                                                         setSelectedRequest(req);
                                                         setShowDetailsModal(true);
                                                     }}
                                                 >
                                                     <td>
-                                                        <div className="font-medium text-gray-900">
+                                                        <div className="requester-name">
                                                             {req.requesterName || req.requester?.name || 'Unknown'}
                                                         </div>
-                                                        <div className="text-xs text-gray-500 mt-0.5">
-                                                            Employee ID: {employeeDisplayId}
+                                                        <div className="requester-id">
+                                                            ID: {employeeDisplayId}
                                                         </div>
                                                     </td>
-                                                    <td className="text-gray-600">
+                                                    <td className="department-cell">
                                                         {req.department || 'N/A'}
                                                     </td>
                                                     <td>
-                                                        <div className="font-medium text-gray-900">{req.items?.length || 0} item(s)</div>
-                                                        <div className="text-xs text-gray-500 truncate max-w-xs mt-0.5">
+                                                        <div className="items-count">{req.items?.length || 0} item(s)</div>
+                                                        <div className="items-preview">
                                                             {req.items?.map(i => i.itemName).slice(0, 2).join(', ')}
                                                             {req.items?.length > 2 && '...'}
                                                         </div>
                                                     </td>
-                                                    <td className="text-right font-medium text-gray-900">
+                                                    <td className="quantity-value text-right">
                                                         {totalQuantity}
                                                     </td>
                                                     <td className="text-center">
                                                         {getStatusBadge(req.status)}
                                                     </td>
-                                                    <td className="text-sm text-gray-600">
+                                                    <td className="date-value">
                                                         {formatDate(req.createdAt || req.dateRequested)}
                                                     </td>
                                                     <td className="text-center">
                                                         {isPending && (
-                                                            <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
                                                                 <button
                                                                     onClick={() => {
                                                                         setSelectedRequest(req);
                                                                         setShowApproveModal(true);
                                                                     }}
-                                                                    className="btn btn-primary"
+                                                                    className="action-btn btn-approve"
                                                                     disabled={processingId === req._id}
                                                                 >
                                                                     Approve
@@ -514,7 +496,7 @@ const RequestApproval = () => {
                                                                         setSelectedRequest(req);
                                                                         setShowRejectModal(true);
                                                                     }}
-                                                                    className="btn btn-danger"
+                                                                    className="action-btn btn-reject"
                                                                     disabled={processingId === req._id}
                                                                 >
                                                                     Reject
@@ -522,7 +504,7 @@ const RequestApproval = () => {
                                                             </div>
                                                         )}
                                                         {!isPending && (
-                                                            <span className="text-xs text-gray-400">Processed</span>
+                                                            <span className="processed-badge">Processed</span>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -534,25 +516,25 @@ const RequestApproval = () => {
 
                             {/* Pagination */}
                             {totalPages > 1 && (
-                                <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                                    <div className="text-sm text-gray-600">
+                                <div className="pagination-wrapper">
+                                    <div className="pagination-info">
                                         Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredRequisitions.length)} of {filteredRequisitions.length} requisitions
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="pagination-controls">
                                         <button
                                             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                             disabled={currentPage === 1}
-                                            className="btn btn-secondary"
+                                            className="pagination-btn"
                                         >
                                             Previous
                                         </button>
-                                        <span className="px-3 py-1 text-sm">
+                                        <span className="pagination-page">
                                             Page {currentPage} of {totalPages}
                                         </span>
                                         <button
                                             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                             disabled={currentPage === totalPages}
-                                            className="btn btn-secondary"
+                                            className="pagination-btn"
                                         >
                                             Next
                                         </button>
@@ -567,53 +549,53 @@ const RequestApproval = () => {
             {/* Details Modal */}
             {showDetailsModal && selectedRequest && (
                 <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-                    <div className="modal-content max-w-3xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-gray-200 p-6">
-                            <div className="flex justify-between items-start">
+                    <div className="modal-content modal-content-wide" onClick={e => e.stopPropagation()}>
+                        <div className="modal-sticky-header">
+                            <div className="modal-header-flex">
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-900">Requisition Details</h2>
-                                    <div className="flex items-center gap-2 mt-2">
+                                    <h2 className="modal-title">Requisition Details</h2>
+                                    <div className="modal-badge-group">
                                         {getStatusBadge(selectedRequest.status)}
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setShowDetailsModal(false)}
-                                    className="text-2xl text-gray-400 hover:text-gray-600"
+                                    className="modal-close"
                                 >
                                     ×
                                 </button>
                             </div>
                         </div>
 
-                        <div className="p-6 space-y-6">
+                        <div className="modal-body">
                             {/* Requester Info */}
-                            <div className="bg-gray-50 rounded-lg p-4">
-                                <h3 className="font-medium text-gray-900 mb-3">Requester Information</h3>
-                                <div className="grid grid-cols-2 gap-4">
+                            <div className="info-section">
+                                <h3 className="section-title">Requester Information</h3>
+                                <div className="info-grid">
                                     <div>
-                                        <p className="text-xs text-gray-500">Name</p>
-                                        <p className="font-medium">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</p>
+                                        <p className="info-label">Name</p>
+                                        <p className="info-value">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500">Employee ID</p>
-                                        <p className="font-medium">{getEmployeeDisplayId(selectedRequest)}</p>
+                                        <p className="info-label">Employee ID</p>
+                                        <p className="info-value">{getEmployeeDisplayId(selectedRequest)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500">Department</p>
-                                        <p className="font-medium">{selectedRequest.department || 'N/A'}</p>
+                                        <p className="info-label">Department</p>
+                                        <p className="info-value">{selectedRequest.department || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500">Date Requested</p>
-                                        <p className="font-medium">{formatDate(selectedRequest.createdAt || selectedRequest.dateRequested)}</p>
+                                        <p className="info-label">Date Requested</p>
+                                        <p className="info-value">{formatDate(selectedRequest.createdAt || selectedRequest.dateRequested)}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Notes/Purpose */}
                             {selectedRequest.notes && (
-                                <div>
-                                    <h3 className="font-medium text-gray-900 mb-2">Notes / Purpose</h3>
-                                    <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">
+                                <div className="notes-section">
+                                    <h3 className="section-title">Notes / Purpose</h3>
+                                    <p className="notes-content">
                                         {selectedRequest.notes}
                                     </p>
                                 </div>
@@ -621,9 +603,9 @@ const RequestApproval = () => {
 
                             {/* Items */}
                             <div>
-                                <h3 className="font-medium text-gray-900 mb-3">Requested Items</h3>
-                                <div className="table-wrapper">
-                                    <table className="table">
+                                <h3 className="section-title">Requested Items</h3>
+                                <div className="items-table-wrapper">
+                                    <table className="items-table">
                                         <thead>
                                             <tr>
                                                 <th>Item Name</th>
@@ -640,24 +622,24 @@ const RequestApproval = () => {
                                                     <td>{item.itemName}</td>
                                                     <td>{item.category || '—'}</td>
                                                     <td>{item.unit || '—'}</td>
-                                                    <td className="text-right font-medium">{item.quantity}</td>
+                                                    <td className="text-right">{item.quantity}</td>
                                                     <td className="text-right">
                                                         {item.unitPrice ? `$${item.unitPrice.toFixed(2)}` : '—'}
                                                     </td>
-                                                    <td className="text-right font-semibold text-primary-600">
+                                                    <td className="text-right font-semibold">
                                                         {item.totalPrice ? `$${item.totalPrice.toFixed(2)}` : '—'}
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         <tfoot>
-                                            <tr className="bg-gray-50 font-medium">
-                                                <td colSpan="3" className="text-right">Totals:</td>
-                                                <td className="text-right">
+                                            <tr>
+                                                <td colSpan="3" className="text-right font-semibold">Totals:</td>
+                                                <td className="text-right font-semibold">
                                                     {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
                                                 </td>
                                                 <td className="text-right">—</td>
-                                                <td className="text-right font-bold text-primary-600">
+                                                <td className="text-right font-semibold">
                                                     ${selectedRequest.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2) || '0.00'}
                                                 </td>
                                             </tr>
@@ -665,31 +647,31 @@ const RequestApproval = () => {
                                     </table>
                                 </div>
                             </div>
-
-                            {/* Actions */}
-                            {selectedRequest.status?.toLowerCase() === 'pending' && (
-                                <div className="flex justify-end gap-3 pt-4 border-t">
-                                    <button
-                                        onClick={() => {
-                                            setShowDetailsModal(false);
-                                            setShowRejectModal(true);
-                                        }}
-                                        className="btn btn-danger"
-                                    >
-                                        Reject
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowDetailsModal(false);
-                                            setShowApproveModal(true);
-                                        }}
-                                        className="btn btn-primary"
-                                    >
-                                        Approve
-                                    </button>
-                                </div>
-                            )}
                         </div>
+
+                        {/* Actions */}
+                        {selectedRequest.status?.toLowerCase() === 'pending' && (
+                            <div className="modal-footer">
+                                <button
+                                    onClick={() => {
+                                        setShowDetailsModal(false);
+                                        setShowRejectModal(true);
+                                    }}
+                                    className="action-btn btn-reject"
+                                >
+                                    Reject
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowDetailsModal(false);
+                                        setShowApproveModal(true);
+                                    }}
+                                    className="action-btn btn-approve"
+                                >
+                                    Approve
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -697,56 +679,51 @@ const RequestApproval = () => {
             {/* Approve Modal */}
             {showApproveModal && selectedRequest && (
                 <div className="modal-overlay" onClick={() => setShowApproveModal(false)}>
-                    <div className="modal-content max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                    <span className="text-2xl">✅</span>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900">Approve Requisition</h2>
-                                    <p className="text-sm text-gray-500">Review the details before approving</p>
-                                </div>
+                    <div className="modal-content modal-content-medium" onClick={e => e.stopPropagation()}>
+                        <div className="modal-body">
+                            <div className="modal-header-simple">
+                                <h2 className="modal-title">Approve Requisition</h2>
+                                <p className="modal-subtitle">Review the details before approving</p>
                             </div>
 
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                <p className="text-sm text-gray-600 mb-2">
-                                    Approve requisition from <span className="font-medium text-gray-900">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</span>
+                            <div className="requirement-summary">
+                                <p className="requester-info">
+                                    Approve requisition from <strong>{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</strong>
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="requester-details">
                                     Employee ID: {getEmployeeDisplayId(selectedRequest)} | Items: {selectedRequest.items?.length || 0} | Total Qty: {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)}
                                 </p>
                             </div>
 
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks (Optional)</label>
+                            <div className="form-group">
+                                <label className="form-label">Remarks (Optional)</label>
                                 <textarea
                                     value={remarks}
                                     onChange={(e) => setRemarks(e.target.value)}
                                     rows="3"
-                                    className="input"
+                                    className="textarea-input"
                                     placeholder="Add any remarks..."
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-3">
+                            <div className="modal-footer">
                                 <button
                                     onClick={() => {
                                         setShowApproveModal(false);
                                         setRemarks('');
                                     }}
-                                    className="btn btn-secondary"
+                                    className="btn-secondary"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleApprove}
                                     disabled={processingId === selectedRequest._id}
-                                    className="btn btn-primary"
+                                    className="action-btn btn-approve"
                                 >
                                     {processingId === selectedRequest._id ? (
                                         <>
-                                            <span className="spinner-sm"></span>
+                                            <span className="spinner-small"></span>
                                             Approving...
                                         </>
                                     ) : (
@@ -762,59 +739,54 @@ const RequestApproval = () => {
             {/* Reject Modal */}
             {showRejectModal && selectedRequest && (
                 <div className="modal-overlay" onClick={() => setShowRejectModal(false)}>
-                    <div className="modal-content max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                                    <span className="text-2xl">❌</span>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900">Reject Requisition</h2>
-                                    <p className="text-sm text-gray-500">Please provide a reason for rejection</p>
-                                </div>
+                    <div className="modal-content modal-content-medium" onClick={e => e.stopPropagation()}>
+                        <div className="modal-body">
+                            <div className="modal-header-simple">
+                                <h2 className="modal-title">Reject Requisition</h2>
+                                <p className="modal-subtitle">Please provide a reason for rejection</p>
                             </div>
 
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                <p className="text-sm text-gray-600 mb-2">
-                                    Reject requisition from <span className="font-medium text-gray-900">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</span>
+                            <div className="requirement-summary">
+                                <p className="requester-info">
+                                    Reject requisition from <strong>{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</strong>
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="requester-details">
                                     Employee ID: {getEmployeeDisplayId(selectedRequest)}
                                 </p>
                             </div>
 
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Reason for Rejection <span className="text-red-500">*</span>
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Reason for Rejection <span className="required">*</span>
                                 </label>
                                 <textarea
                                     value={remarks}
                                     onChange={(e) => setRemarks(e.target.value)}
                                     rows="3"
-                                    className="input"
+                                    className="textarea-input"
                                     placeholder="Please provide a reason..."
                                     required
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-3">
+                            <div className="modal-footer">
                                 <button
                                     onClick={() => {
                                         setShowRejectModal(false);
                                         setRemarks('');
                                     }}
-                                    className="btn btn-secondary"
+                                    className="btn-secondary"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleReject}
                                     disabled={!remarks || processingId === selectedRequest._id}
-                                    className="btn btn-danger"
+                                    className="action-btn btn-reject"
                                 >
                                     {processingId === selectedRequest._id ? (
                                         <>
-                                            <span className="spinner-sm"></span>
+                                            <span className="spinner-small"></span>
                                             Rejecting...
                                         </>
                                     ) : (
