@@ -23,7 +23,7 @@
 }
 
 .psa-logo {
-  width: 140px;
+  width: 100px;
   height: auto;
   margin: auto
 }
@@ -86,6 +86,13 @@
   font-size: 0.875rem;
   font-weight: 500;
   flex: 1;
+}
+
+.title-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-top: 0.5rem;
 }
 
 .sidebar-footer {
@@ -164,4 +171,55 @@
 .sidebar.collapsed .menu-icon {
   width: 24px;
   height: 24px;
+}
+
+.sidebar-logout {
+  padding: 0.5rem 0.75rem;
+  margin-top: auto;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+.logout-item {
+  padding: 0.625rem 0.875rem;
+  margin: 0.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--sidebar-text);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sidebar.collapsed .logout-item {
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.logout-item:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.logout-item:hover .menu-icon {
+  color: #ef4444;
+}
+
+/* ============================================
+   MENU CONFIGURATION BY ROLE
+   ============================================ */
+/* These classes can be used for role-based styling if needed */
+.sidebar-menu[data-role="superadmin"] .menu-item {
+  /* Superadmin specific styles */
+}
+
+.sidebar-menu[data-role="admin"] .menu-item {
+  /* Admin specific styles */
+}
+
+.sidebar-menu[data-role="employee"] .menu-item {
+  /* Employee specific styles */
 }
