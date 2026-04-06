@@ -29,7 +29,7 @@ const ListOfSupplies = () => {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/inventory', {
+      const response = await fetch('http://localhost:5000/api/inventories', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 

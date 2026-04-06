@@ -1,50 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import './ApproveRequests.css';
 
 const ApproveRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [filter, setFilter] = useState('approved');
   const [processingId, setProcessingId] = useState(null);
   const [allNonPendingRequests, setAllNonPendingRequests] = useState([]);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [remarks, setRemarks] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(6);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   // Fetch all non-pending requests for accurate counting
-  useEffect(() => {
-    const fetchAllNonPending = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/api/requisitions`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+  const fetchAllNonPending = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/requisitions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch requisitions');
-        }
-
-        const data = await response.json();
-        const allRequests = data.requests || data.data || [];
-        const nonPendingRequests = allRequests.filter(req => {
-          const status = (req.status || '').toLowerCase();
-          return status !== 'pending';
-        });
-        setAllNonPendingRequests(nonPendingRequests);
-      } catch (error) {
-        console.error("Error fetching all requests:", error);
+      if (!response.ok) {
+        throw new Error('Failed to fetch requisitions');
       }
-    };
-    fetchAllNonPending();
-  }, []);
+
+      const data = await response.json();
+      const allRequests = data.requests || data.data || [];
+      const nonPendingRequests = allRequests.filter(req => {
+        const status = (req.status || '').toLowerCase();
+        return status !== 'pending';
+      });
+      setAllNonPendingRequests(nonPendingRequests);
+    } catch (error) {
+      console.error("Error fetching all requests:", error);
+    }
+  }, [API_BASE_URL]);
 
   // Fetch filtered requests for display
-  useEffect(() => {
-    fetchRequests();
-  }, [filter]);
-
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -59,13 +58,11 @@ const ApproveRequests = () => {
       const data = await response.json();
       const requestsData = data.requests || data.data || [];
 
-      // Filter out pending requests
       const nonPendingRequests = requestsData.filter(req => {
         const status = (req.status || '').toLowerCase();
         return status !== 'pending';
       });
 
-      // Apply filter (case-insensitive)
       let filteredData = nonPendingRequests;
       if (filter !== 'all') {
         filteredData = nonPendingRequests.filter(req =>
@@ -74,14 +71,21 @@ const ApproveRequests = () => {
       }
 
       setRequests(filteredData);
+      setError('');
     } catch (error) {
       console.error("Fetch error", error);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL, filter]);
 
-  const handlePrintPDF = async (requestId) => {
+  useEffect(() => {
+    fetchAllNonPending();
+    fetchRequests();
+  }, [fetchAllNonPending, fetchRequests]);
+
+  const handlePrintPDF = useCallback(async (requestId) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/requisitions/${requestId}/pdf`, {
@@ -101,9 +105,10 @@ const ApproveRequests = () => {
       console.error('PDF error:', error);
       alert('Error fetching PDF');
     }
-  };
+  }, [API_BASE_URL]);
 
-  const handleIssue = async (requestId) => {
+  // FIXED: Use the correct endpoint for issuing
+  const handleIssue = useCallback(async (requestId) => {
     if (!remarks.trim()) {
       alert("Please provide issuance remarks");
       return;
@@ -113,8 +118,8 @@ const ApproveRequests = () => {
       setProcessingId(requestId);
       const token = localStorage.getItem('token');
 
-      // Update the requisition status to "issued"
-      const response = await fetch(`${API_BASE_URL}/api/requisitions/${requestId}`, {
+      // FIXED: Use the correct endpoint - /api/requisitions/:id/issue
+      const response = await fetch(`${API_BASE_URL}/api/requisitions/${requestId}/issue`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -134,33 +139,24 @@ const ApproveRequests = () => {
       }
 
       await fetchRequests();
-
-      // Refresh the all non-pending requests as well
-      const allResponse = await fetch(`${API_BASE_URL}/api/requisitions`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (allResponse.ok) {
-        const allData = await allResponse.json();
-        const allRequests = allData.requests || allData.data || [];
-        const nonPendingRequests = allRequests.filter(req => {
-          const status = (req.status || '').toLowerCase();
-          return status !== 'pending';
-        });
-        setAllNonPendingRequests(nonPendingRequests);
-      }
+      await fetchAllNonPending();
 
       setShowIssueModal(false);
       setRemarks('');
-      alert('📦 Requisition issued successfully!');
+      setSelectedRequest(null);
+      setSuccess('Requisition issued successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Error issuing requisition');
+      setError(error.message || 'Error issuing requisition');
+      setTimeout(() => setError(''), 3000);
     } finally {
       setProcessingId(null);
     }
-  };
+  }, [remarks, API_BASE_URL, fetchRequests, fetchAllNonPending]);
 
-  const formatDate = (date) => {
+  const formatDate = useCallback((date) => {
     if (!date) return "N/A";
     try {
       return new Date(date).toLocaleDateString("en-US", {
@@ -173,310 +169,348 @@ const ApproveRequests = () => {
     } catch {
       return "Invalid date";
     }
-  };
+  }, []);
 
-  const normalizeStatus = (status) => {
-    if (!status) return '';
-    return status.toLowerCase();
-  };
+  const formatCurrency = useCallback((amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
+  }, []);
 
-  const getStatusBadge = (status) => {
-    const normalizedStatus = normalizeStatus(status);
+  const getStatusBadge = useCallback((status) => {
+    const normalizedStatus = (status || '').toLowerCase();
+    const badges = {
+      approved: { class: 'badge-approved', text: 'Approved', icon: '✓' },
+      rejected: { class: 'badge-rejected', text: 'Rejected', icon: '✗' },
+      issued: { class: 'badge-issued', text: 'Issued', icon: '📦' }
+    };
+    const config = badges[normalizedStatus] || { class: 'badge-default', text: status || 'Unknown', icon: '?' };
+    return (
+      <span className={`status-badge ${config.class}`}>
+        <span className="badge-icon">{config.icon}</span>
+        {config.text}
+      </span>
+    );
+  }, []);
 
-    switch (normalizedStatus) {
-      case 'approved':
-        return <span className="badge badge-approved">✅ Approved - Ready for Issuance</span>;
-      case 'rejected':
-        return <span className="badge badge-rejected">❌ Rejected</span>;
-      case 'issued':
-        return <span className="badge badge-issued">📦 Issued</span>;
-      default:
-        return <span className="badge">{status || 'Unknown'}</span>;
-    }
-  };
-
-  const getAccurateStatusCount = (targetStatus) => {
+  const getAccurateStatusCount = useCallback((targetStatus) => {
     return allNonPendingRequests.filter(req =>
-      normalizeStatus(req.status) === targetStatus
+      (req.status || '').toLowerCase() === targetStatus
     ).length;
-  };
+  }, [allNonPendingRequests]);
+
+  const filteredRequests = useMemo(() => {
+    if (!searchTerm) return requests;
+    const term = searchTerm.toLowerCase();
+    return requests.filter(req =>
+      (req.requesterName || '').toLowerCase().includes(term) ||
+      (req.department || '').toLowerCase().includes(term) ||
+      (req.employeeId || '').toLowerCase().includes(term)
+    );
+  }, [requests, searchTerm]);
+
+  const paginatedRequests = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredRequests.slice(start, start + itemsPerPage);
+  }, [filteredRequests, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="spinner-lg"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading requests...</p>
-        </div>
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p className="loading-text">Loading requests...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
-      <div className="container-custom py-8">
+    <div className="approve-container">
+      <div className="approve-wrapper">
         {/* Header */}
-        <div className="mb-8 animate-fade-in">
-          <h1 className="gradient-text">Requests Management</h1>
-          <p className="text-gray-600 mt-2">
-            Review approved requests and process issuance. Rejected requests for reference.
-          </p>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Requests Management</h1>
+            <p className="page-subtitle">Review approved requests and process issuance</p>
+          </div>
         </div>
 
+        {/* Alert Messages */}
+        {error && (
+          <div className="alert alert-error">
+            <span className="alert-icon">⚠️</span>
+            <span className="alert-message">{error}</span>
+          </div>
+        )}
+
+        {success && (
+          <div className="alert alert-success">
+            <span className="alert-icon">✓</span>
+            <span className="alert-message">{success}</span>
+          </div>
+        )}
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Approved (Ready for Issuance)</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {getAccurateStatusCount('approved')}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <span className="text-xl">✅</span>
-              </div>
+        <div className="stats-grid">
+          <div className="stat-card stat-approved">
+            <div className="stat-icon">✓</div>
+            <div className="stat-info">
+              <span className="stat-label">Approved</span>
+              <span className="stat-value">{getAccurateStatusCount('approved')}</span>
             </div>
           </div>
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Issued</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {getAccurateStatusCount('issued')}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-xl">📦</span>
-              </div>
+          <div className="stat-card stat-issued">
+            <div className="stat-icon">📦</div>
+            <div className="stat-info">
+              <span className="stat-label">Issued</span>
+              <span className="stat-value">{getAccurateStatusCount('issued')}</span>
             </div>
           </div>
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Rejected</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {getAccurateStatusCount('rejected')}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <span className="text-xl">❌</span>
-              </div>
+          <div className="stat-card stat-rejected">
+            <div className="stat-icon">✗</div>
+            <div className="stat-info">
+              <span className="stat-label">Rejected</span>
+              <span className="stat-value">{getAccurateStatusCount('rejected')}</span>
             </div>
           </div>
         </div>
 
         {/* Filter Tabs */}
-        <div className="card p-5 mb-6">
-          <div className="flex flex-wrap gap-2">
+        <div className="filter-section">
+          <div className="filter-tabs">
             {['approved', 'rejected', 'issued', 'all'].map(f => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
-                className={`btn ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => { setFilter(f); setCurrentPage(1); }}
+                className={`filter-tab ${filter === f ? 'active' : ''}`}
               >
-                {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === 'all' ? 'All Requests' : f.charAt(0).toUpperCase() + f.slice(1)}
                 {f !== 'all' && (
-                  <span className="ml-2 text-xs opacity-75">
-                    ({getAccurateStatusCount(f)})
-                  </span>
+                  <span className="filter-count">({getAccurateStatusCount(f)})</span>
                 )}
               </button>
             ))}
           </div>
+
+          <div className="search-wrapper">
+            <span className="search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder="Search by name, department, or employee ID..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="search-input"
+            />
+            {searchTerm && (
+              <button className="clear-search" onClick={() => setSearchTerm('')}>✕</button>
+            )}
+          </div>
         </div>
 
-        {/* Request List */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {requests.length === 0 ? (
-            <div className="col-span-2 text-center py-12">
-              <div className="text-5xl mb-4">📭</div>
-              <h3 className="text-xl font-medium text-gray-900 mb-2">No Requests Found</h3>
-              <p className="text-gray-600">No {filter !== 'all' ? filter : ''} requests available</p>
-            </div>
-          ) : (
-            requests.map(request => {
-              const totalQuantity = request.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-              const normalizedStatus = normalizeStatus(request.status);
-              const isApproved = normalizedStatus === 'approved';
-              const isIssued = normalizedStatus === 'issued';
+        {/* Request Cards Grid */}
+        {filteredRequests.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">📭</div>
+            <h3 className="empty-title">No Requests Found</h3>
+            <p className="empty-description">
+              {searchTerm ? 'Try adjusting your search' : `No ${filter !== 'all' ? filter : ''} requests available`}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="requests-grid">
+              {paginatedRequests.map(request => {
+                const totalQuantity = request.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+                const totalValue = request.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
+                const normalizedStatus = (request.status || '').toLowerCase();
+                const isApproved = normalizedStatus === 'approved';
+                const isIssued = normalizedStatus === 'issued';
 
-              return (
-                <div key={request._id} className="card overflow-hidden hover:shadow-lg transition-all duration-300">
-                  {/* Card Header */}
-                  <div className="p-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
-                          {request.requesterName || 'Unknown'}
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          {request.department || 'N/A'}
-                        </p>
+                return (
+                  <div key={request._id} className={`request-card ${normalizedStatus}`}>
+                    {/* Card Header */}
+                    <div className="card-header">
+                      <div className="requester-info">
+                        <h3 className="requester-name">{request.requesterName || 'Unknown'}</h3>
+                        <p className="requester-dept">{request.department || 'N/A'}</p>
                         {request.employeeId && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            Employee ID: {request.employeeId}
-                          </p>
+                          <p className="requester-id">ID: {request.employeeId}</p>
                         )}
                       </div>
-                      <div className="text-right">
-                        {getStatusBadge(request.status)}
+                      {getStatusBadge(request.status)}
+                    </div>
+
+                    {/* Card Content */}
+                    <div className="card-content">
+                      {/* Items Preview */}
+                      <div className="items-preview">
+                        <p className="items-label">Requested Items:</p>
+                        <div className="items-list">
+                          {request.items?.slice(0, 2).map((item, idx) => (
+                            <div key={idx} className="item-row">
+                              <span className="item-name">{item.itemName}</span>
+                              <span className="item-qty">{item.quantity} {item.unit || 'pcs'}</span>
+                            </div>
+                          ))}
+                          {request.items?.length > 2 && (
+                            <p className="more-items">+{request.items.length - 2} more items</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="card-stats">
+                        <div className="stat">
+                          <span className="stat-label">Items</span>
+                          <span className="stat-value">{request.items?.length || 0}</span>
+                        </div>
+                        <div className="stat">
+                          <span className="stat-label">Total Qty</span>
+                          <span className="stat-value">{totalQuantity}</span>
+                        </div>
+                        <div className="stat">
+                          <span className="stat-label">Total Value</span>
+                          <span className="stat-value">{formatCurrency(totalValue)}</span>
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      {request.notes && (
+                        <div className="notes-section">
+                          <p className="notes-label">📝 Notes:</p>
+                          <p className="notes-text">{request.notes}</p>
+                        </div>
+                      )}
+
+                      {/* Processing Info */}
+                      {(isApproved || normalizedStatus === 'rejected') && (
+                        <div className="processing-info">
+                          <p className="info-label">Processing Remarks:</p>
+                          <p className="info-text">{request.approverRemarks || request.remarks || 'N/A'}</p>
+                          <p className="info-date">Processed: {formatDate(request.approvedDate || request.processedDate)}</p>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="card-actions">
+                        <button
+                          onClick={() => setSelectedRequest(request)}
+                          className="btn-view"
+                        >
+                          View Details
+                        </button>
+                        {isApproved && (
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setShowIssueModal(true);
+                            }}
+                            disabled={processingId === request._id}
+                            className="btn-issue"
+                          >
+                            Issue Items
+                          </button>
+                        )}
+                        {isIssued && (
+                          <button
+                            onClick={() => handlePrintPDF(request._id)}
+                            className="btn-pdf"
+                          >
+                            Export PDF
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Card Content */}
-                  <div className="p-5 space-y-4">
-                    {/* Items Summary */}
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Items Requested:</p>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        {request.items?.slice(0, 3).map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sm mb-1 last:mb-0">
-                            <span className="text-gray-600">{item.itemName}</span>
-                            <span className="font-medium text-gray-900">
-                              {item.quantity} {item.unit || 'pcs'}
-                            </span>
-                          </div>
-                        ))}
-                        {request.items?.length > 3 && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            +{request.items.length - 3} more items
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-blue-50 rounded-lg p-2 text-center">
-                        <p className="text-xs text-gray-500">Total Items</p>
-                        <p className="text-lg font-bold text-blue-600">{request.items?.length || 0}</p>
-                      </div>
-                      <div className="bg-green-50 rounded-lg p-2 text-center">
-                        <p className="text-xs text-gray-500">Total Quantity</p>
-                        <p className="text-lg font-bold text-green-600">{totalQuantity}</p>
-                      </div>
-                    </div>
-
-                    {/* Notes */}
-                    {request.notes && (
-                      <div className="bg-yellow-50 rounded-lg p-3 border-l-4 border-yellow-400">
-                        <p className="text-xs text-gray-500 mb-1">Notes:</p>
-                        <p className="text-sm text-gray-700">{request.notes}</p>
-                      </div>
-                    )}
-
-                    {/* Processed Info */}
-                    {(isApproved || normalizedStatus === 'rejected') && (
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-xs text-gray-500 mb-1">Processing Info:</p>
-                        <p className="text-sm text-gray-700">
-                          <strong>Remarks:</strong> {request.approverRemarks || request.remarks || 'N/A'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Processed: {formatDate(request.approvedDate || request.processedDate)}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        onClick={() => setSelectedRequest(request)}
-                        className="flex-1 btn btn-secondary"
-                      >
-                        View Details
-                      </button>
-                      {isApproved && (
-                        <button
-                          onClick={() => {
-                            setSelectedRequest(request);
-                            setShowIssueModal(true);
-                          }}
-                          disabled={processingId === request._id}
-                          className="flex-1 btn btn-primary"
-                        >
-                          Issue Items
-                        </button>
-                      )}
-                      {isIssued && (
-                        <button
-                          onClick={() => handlePrintPDF(request._id)}
-                          className="flex-1 btn btn-primary"
-                        >
-                          Generate PDF
-                        </button>
-                      )}
-                    </div>
-                  </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="pagination-wrapper">
+                <div className="pagination-info">
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} requests
                 </div>
-              );
-            })
-          )}
-        </div>
+                <div className="pagination-controls">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="pagination-btn"
+                  >
+                    Previous
+                  </button>
+                  <span className="pagination-page">Page {currentPage} of {totalPages}</span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="pagination-btn"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Details Modal */}
       {selectedRequest && !showIssueModal && (
         <div className="modal-overlay" onClick={() => setSelectedRequest(null)}>
-          <div className="modal-content max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Requisition Details</h2>
-                  <div className="mt-2">
-                    {getStatusBadge(selectedRequest.status)}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedRequest(null)}
-                  className="text-2xl text-gray-400 hover:text-gray-600"
-                >
-                  ×
-                </button>
-              </div>
+          <div className="modal-container modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Requisition Details</h2>
+              <button className="modal-close" onClick={() => setSelectedRequest(null)}>×</button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="modal-body">
+              <div className="modal-status">
+                {getStatusBadge(selectedRequest.status)}
+              </div>
+
               {/* Requester Info */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900 mb-3">Requester Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500">Name</p>
-                    <p className="font-medium">{selectedRequest.requesterName || 'Unknown'}</p>
+              <div className="info-section">
+                <h3 className="section-title">Requester Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Name</label>
+                    <p>{selectedRequest.requesterName || 'Unknown'}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Employee ID</p>
-                    <p className="font-medium">{selectedRequest.employeeId || selectedRequest.requesterId || 'N/A'}</p>
+                  <div className="info-item">
+                    <label>Employee ID</label>
+                    <p>{selectedRequest.employeeId || selectedRequest.requesterId || 'N/A'}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Department</p>
-                    <p className="font-medium">{selectedRequest.department || 'N/A'}</p>
+                  <div className="info-item">
+                    <label>Department</label>
+                    <p>{selectedRequest.department || 'N/A'}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Date Requested</p>
-                    <p className="font-medium">{formatDate(selectedRequest.createdAt || selectedRequest.dateRequested)}</p>
+                  <div className="info-item">
+                    <label>Date Requested</label>
+                    <p>{formatDate(selectedRequest.createdAt || selectedRequest.dateRequested)}</p>
                   </div>
                 </div>
               </div>
 
               {/* Notes */}
               {selectedRequest.notes && (
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Notes / Purpose</h3>
-                  <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">
-                    {selectedRequest.notes}
-                  </p>
+                <div className="notes-section">
+                  <h3 className="section-title">Notes / Purpose</h3>
+                  <p className="notes-content">{selectedRequest.notes}</p>
                 </div>
               )}
 
               {/* Items Table */}
               <div>
-                <h3 className="font-medium text-gray-900 mb-3">Requested Items</h3>
+                <h3 className="section-title">Requested Items</h3>
                 <div className="table-wrapper">
-                  <table className="table">
+                  <table className="details-table">
                     <thead>
                       <tr>
                         <th>Item Name</th>
@@ -490,62 +524,42 @@ const ApproveRequests = () => {
                     <tbody>
                       {selectedRequest.items?.map((item, idx) => (
                         <tr key={idx}>
-                          <td className="font-medium">{item.itemName}</td>
+                          <td className="item-name-cell">{item.itemName}</td>
                           <td>{item.category || '—'}</td>
                           <td>{item.unit || '—'}</td>
                           <td className="text-right">{item.quantity}</td>
-                          <td className="text-right">
-                            {item.unitPrice ? `$${item.unitPrice.toFixed(2)}` : '—'}
-                          </td>
-                          <td className="text-right font-semibold text-primary-600">
-                            {item.totalPrice ? `$${item.totalPrice.toFixed(2)}` : '—'}
-                          </td>
+                          <td className="text-right">{formatCurrency(item.unitPrice)}</td>
+                          <td className="text-right total-cell">{formatCurrency(item.totalPrice)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-gray-50 font-medium">
+                      <tr className="total-row">
                         <td colSpan="3" className="text-right">Totals:</td>
                         <td className="text-right">
                           {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
                         </td>
                         <td className="text-right">—</td>
-                        <td className="text-right font-bold text-primary-600">
-                          ${selectedRequest.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2) || '0.00'}
+                        <td className="text-right total-value">
+                          {formatCurrency(selectedRequest.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0))}
                         </td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               </div>
+            </div>
 
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                {normalizeStatus(selectedRequest.status) === 'approved' && (
-                  <button
-                    onClick={() => {
-                      setShowIssueModal(true);
-                    }}
-                    className="btn btn-primary"
-                  >
-                    Issue Items
-                  </button>
-                )}
-                {(normalizeStatus(selectedRequest.status) === 'approved' || normalizeStatus(selectedRequest.status) === 'issued') && (
-                  <button
-                    onClick={() => handlePrintPDF(selectedRequest._id)}
-                    className="btn btn-primary"
-                  >
-                    Export PDF
-                  </button>
-                )}
+            <div className="modal-footer">
+              {selectedRequest.status?.toLowerCase() === 'approved' && (
                 <button
-                  onClick={() => setSelectedRequest(null)}
-                  className="btn btn-secondary"
+                  onClick={() => setShowIssueModal(true)}
+                  className="btn-issue-modal"
                 >
-                  Close
+                  Issue Items
                 </button>
-              </div>
+              )}
+              <button className="btn-secondary" onClick={() => setSelectedRequest(null)}>Close</button>
             </div>
           </div>
         </div>
@@ -557,66 +571,71 @@ const ApproveRequests = () => {
           setShowIssueModal(false);
           setRemarks('');
         }}>
-          <div className="modal-content max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">📦</span>
+          <div className="modal-container" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Issue Items</h2>
+              <button className="modal-close" onClick={() => {
+                setShowIssueModal(false);
+                setRemarks('');
+              }}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="issue-info">
+                <div className="issue-recipient">
+                  <span className="issue-label">Recipient:</span>
+                  <span className="issue-value">{selectedRequest.requesterName || 'Unknown'}</span>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Issue Items</h2>
-                  <p className="text-sm text-gray-500">Confirm issuance of items</p>
+                <div className="issue-details">
+                  <span className="issue-label">Items:</span>
+                  <span className="issue-value">{selectedRequest.items?.length || 0} items</span>
+                </div>
+                <div className="issue-details">
+                  <span className="issue-label">Total Quantity:</span>
+                  <span className="issue-value">
+                    {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                  </span>
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  Issue items to <span className="font-medium text-gray-900">{selectedRequest.requesterName}</span>
-                </p>
-                <p className="text-xs text-gray-500">
-                  Items: {selectedRequest.items?.length || 0} | Total Qty: {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)}
-                </p>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Issuance Remarks <span className="text-red-500">*</span>
+              <div className="form-group">
+                <label className="form-label">
+                  Issuance Remarks <span className="required">*</span>
                 </label>
                 <textarea
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  rows="3"
-                  className="input"
-                  placeholder="Enter issuance details..."
-                  required
+                  rows={4}
+                  className="form-textarea"
+                  placeholder="Enter issuance details, condition of items, delivery instructions, etc..."
                 />
               </div>
+            </div>
 
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setShowIssueModal(false);
-                    setRemarks('');
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleIssue(selectedRequest._id)}
-                  disabled={!remarks.trim() || processingId === selectedRequest._id}
-                  className="btn btn-primary"
-                >
-                  {processingId === selectedRequest._id ? (
-                    <>
-                      <span className="spinner-sm"></span>
-                      Processing...
-                    </>
-                  ) : (
-                    'Confirm Issuance'
-                  )}
-                </button>
-              </div>
+            <div className="modal-footer">
+              <button
+                className="btn-secondary"
+                onClick={() => {
+                  setShowIssueModal(false);
+                  setRemarks('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => handleIssue(selectedRequest._id)}
+                disabled={!remarks.trim() || processingId === selectedRequest._id}
+              >
+                {processingId === selectedRequest._id ? (
+                  <>
+                    <span className="spinner-small"></span>
+                    Processing...
+                  </>
+                ) : (
+                  'Confirm Issuance'
+                )}
+              </button>
             </div>
           </div>
         </div>

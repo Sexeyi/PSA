@@ -1,9 +1,27 @@
-/* Sidebar.css - Updated for shadcn icons */
+/* Sidebar.css - Professional Sidebar with Profile Footer */
 
+/* ============================================
+   CSS VARIABLES
+   ============================================ */
+:root {
+  --sidebar-bg-start: #0f172a;
+  --sidebar-bg-end: #1e293b;
+  --sidebar-border: #334155;
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-hover: #ffffff;
+  --sidebar-active: #023e8a;
+  --sidebar-hover-bg: rgba(51, 65, 85, 0.6);
+  --danger: #ef4444;
+  --danger-hover: rgba(239, 68, 68, 0.2);
+}
+
+/* ============================================
+   SIDEBAR CONTAINER
+   ============================================ */
 .sidebar {
-  width: 260px;
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-  color: #e2e8f0;
+  width: 300px;
+  background: linear-gradient(180deg, var(--sidebar-bg-start) 0%, var(--sidebar-bg-end) 100%);
+  color: var(--sidebar-text);
   height: 100vh;
   position: fixed;
   left: 0;
@@ -13,26 +31,68 @@
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
   z-index: 50;
   transition: all 0.3s ease;
+  overflow-x: hidden;
 }
 
+/* ============================================
+   LOGO SECTION
+   ============================================ */
 .psa-logo-container {
   padding: 1.5rem;
   text-align: center;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--sidebar-border);
   margin-bottom: 1rem;
+  position: relative;
 }
 
 .psa-logo {
   width: 100px;
   height: auto;
-  margin: auto
+  margin: 0 auto;
 }
 
+.title-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sidebar-text);
+  margin-top: 0.5rem;
+  display: block;
+}
+
+/* Sidebar Toggle Button */
+.sidebar-toggle {
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  background: var(--sidebar-active);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.sidebar-toggle:hover {
+  background: #1e4a8a;
+  transform: translateY(-50%) scale(1.05);
+}
+
+/* ============================================
+   MENU ITEMS
+   ============================================ */
 .sidebar-menu {
   list-style: none;
   padding: 0.5rem 0.75rem;
   margin: 0;
   flex: 1;
+  overflow-y: auto;
 }
 
 .sidebar-menu li {
@@ -43,25 +103,25 @@
   gap: 0.75rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #cbd5e1;
+  color: var(--sidebar-text);
   border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
 }
 
 .sidebar-menu li:hover {
-  background: rgba(51, 65, 85, 0.6);
-  color: white;
+  background: var(--sidebar-hover-bg);
+  color: var(--sidebar-text-hover);
 }
 
 .sidebar-menu li.active {
-  background: #023e8a;
-  color: white;
+  background: var(--sidebar-active);
+  color: var(--sidebar-text-hover);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-menu li.active .menu-icon {
-  color: white;
+  color: var(--sidebar-text-hover);
 }
 
 .menu-icon {
@@ -75,11 +135,11 @@
 }
 
 .sidebar-menu li:hover .menu-icon {
-  color: white;
+  color: var(--sidebar-text-hover);
 }
 
 .sidebar-menu li.active .menu-icon {
-  color: white;
+  color: var(--sidebar-text-hover);
 }
 
 .menu-text {
@@ -88,94 +148,11 @@
   flex: 1;
 }
 
-.title-text {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #cbd5e1;
-  margin-top: 0.5rem;
-}
-
-.sidebar-footer {
-  padding: 1rem 1.25rem;
-  border-top: 1px solid #334155;
-  margin-top: auto;
-}
-
-.user-role {
-  display: block;
-  text-align: center;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #94a3b8;
-  background: rgba(51, 65, 85, 0.5);
-  padding: 0.5rem;
-  border-radius: 0.375rem;
-}
-
-/* Scrollbar styling */
-.sidebar-menu::-webkit-scrollbar {
-  width: 4px;
-}
-
-.sidebar-menu::-webkit-scrollbar-track {
-  background: #1e293b;
-}
-
-.sidebar-menu::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 4px;
-}
-
-.sidebar-menu::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
-/* Responsive sidebar */
-@media (max-width: 768px) {
-  .sidebar {
-    transform: translateX(-100%);
-    width: 280px;
-  }
-  
-  .sidebar.open {
-    transform: translateX(0);
-  }
-}
-
-/* Optional: Collapsed sidebar state */
-.sidebar.collapsed {
-  width: 72px;
-}
-
-.sidebar.collapsed .menu-text {
-  display: none;
-}
-
-.sidebar.collapsed .psa-logo {
-  width: 40px;
-}
-
-.sidebar.collapsed .user-role {
-  font-size: 0.625rem;
-  padding: 0.25rem;
-  word-break: break-word;
-}
-
-.sidebar.collapsed .sidebar-menu li {
-  justify-content: center;
-  padding: 0.75rem;
-}
-
-.sidebar.collapsed .menu-icon {
-  width: 24px;
-  height: 24px;
-}
-
+/* ============================================
+   LOGOUT SECTION
+   ============================================ */
 .sidebar-logout {
   padding: 0.5rem 0.75rem;
-  margin-top: auto;
   border-top: 1px solid var(--sidebar-border);
 }
 
@@ -192,6 +169,104 @@
   font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
+  list-style: none;
+}
+
+.logout-item:hover {
+  background: var(--danger-hover);
+  color: var(--danger);
+}
+
+.logout-item:hover .menu-icon {
+  color: var(--danger);
+}
+
+/* ============================================
+   FOOTER / USER PROFILE SECTION
+   ============================================ */
+.sidebar-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--sidebar-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--sidebar-active) 0%, #1e4a8a 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1rem;
+  color: white;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.user-name {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.125rem;
+}
+
+.user-email {
+  display: block;
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.125rem;
+}
+
+
+/* ============================================
+   COLLAPSED SIDEBAR STATE
+   ============================================ */
+.sidebar.collapsed {
+  width: 72px;
+}
+
+.sidebar.collapsed .menu-text {
+  display: none;
+}
+
+.sidebar.collapsed .psa-logo {
+  width: 40px;
+}
+
+.sidebar.collapsed .title-text {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-menu li {
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.sidebar.collapsed .menu-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .sidebar.collapsed .logout-item {
@@ -199,19 +274,147 @@
   padding: 0.75rem;
 }
 
-.logout-item:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+/* Collapsed Profile */
+.sidebar.collapsed .user-profile {
+  display: none;
 }
 
-.logout-item:hover .menu-icon {
-  color: #ef4444;
+.sidebar.collapsed .user-profile-collapsed {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.user-profile-collapsed {
+  display: none;
+}
+
+.user-avatar-small {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--sidebar-active) 0%, #1e4a8a 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: white;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.user-avatar-small:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Tooltip for collapsed state */
+.sidebar.collapsed .user-profile-collapsed {
+  position: relative;
+}
+
+.sidebar.collapsed .user-profile-collapsed:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 100%;
+  bottom: 50%;
+  transform: translateY(50%);
+  background: var(--sidebar-active);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 100;
+  margin-left: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+.sidebar-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-track {
+  background: var(--sidebar-bg-end);
+  border-radius: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* ============================================
+   RESPONSIVE SIDEBAR
+   ============================================ */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .sidebar.collapsed {
+    transform: translateX(-100%);
+  }
+  
+  .sidebar.collapsed.open {
+    transform: translateX(0);
+    width: 72px;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+  
+  .sidebar-toggle,
+  .sidebar-logout {
+    display: none;
+  }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar-menu li {
+  animation: fadeIn 0.3s ease-out;
 }
 
 /* ============================================
    MENU CONFIGURATION BY ROLE
    ============================================ */
-/* These classes can be used for role-based styling if needed */
 .sidebar-menu[data-role="superadmin"] .menu-item {
   /* Superadmin specific styles */
 }

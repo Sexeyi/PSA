@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './RequestApproval.css';
 
@@ -16,7 +16,7 @@ const RequestApproval = () => {
     const [processingId, setProcessingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
+    const [itemsPerPage] = useState(6);
     const [filterStatus, setFilterStatus] = useState('pending');
     const [stats, setStats] = useState({
         pending: 0,
@@ -51,15 +51,15 @@ const RequestApproval = () => {
         }
     }, [navigate]);
 
-    const extractId = (id) => {
+    const extractId = useCallback((id) => {
         if (!id) return null;
         if (typeof id === 'string') return id;
         if (typeof id === 'object' && id._id) return id._id;
         if (typeof id === 'object' && id.id) return id.id;
         return null;
-    };
+    }, []);
 
-    const fetchRequisitions = async () => {
+    const fetchRequisitions = useCallback(async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
@@ -153,13 +153,13 @@ const RequestApproval = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [API_BASE_URL, extractId]);
 
     useEffect(() => {
         fetchRequisitions();
-    }, []);
+    }, [fetchRequisitions]);
 
-    const handleApprove = async () => {
+    const handleApprove = useCallback(async () => {
         if (!selectedRequest) return;
 
         try {
@@ -190,17 +190,15 @@ const RequestApproval = () => {
             setShowDetailsModal(false);
             setSelectedRequest(null);
             setRemarks('');
-
-            alert('Requisition approved successfully! It is now ready for Admin to issue.');
         } catch (error) {
             console.error('Error approving requisition:', error);
             alert(error.message);
         } finally {
             setProcessingId(null);
         }
-    };
+    }, [selectedRequest, remarks, user, API_BASE_URL, fetchRequisitions]);
 
-    const handleReject = async () => {
+    const handleReject = useCallback(async () => {
         if (!selectedRequest) return;
 
         try {
@@ -231,46 +229,49 @@ const RequestApproval = () => {
             setShowDetailsModal(false);
             setSelectedRequest(null);
             setRemarks('');
-
-            alert('Requisition rejected successfully!');
         } catch (error) {
             console.error('Error rejecting requisition:', error);
             alert(error.message);
         } finally {
             setProcessingId(null);
         }
-    };
+    }, [selectedRequest, remarks, user, API_BASE_URL, fetchRequisitions]);
 
-    const getEmployeeDisplayId = (requisition) => {
-        if (requisition.employeeId) {
-            return requisition.employeeId;
-        }
-        if (requisition.employeeData?.employeeId) {
-            return requisition.employeeData.employeeId;
-        }
-        if (requisition.requesterId && typeof requisition.requesterId === 'string') {
-            return requisition.requesterId;
-        }
+    const getEmployeeDisplayId = useCallback((requisition) => {
+        if (requisition.employeeId) return requisition.employeeId;
+        if (requisition.employeeData?.employeeId) return requisition.employeeData.employeeId;
+        if (requisition.requesterId && typeof requisition.requesterId === 'string') return requisition.requesterId;
         return 'N/A';
-    };
+    }, []);
 
-    const filteredRequisitions = requisitions.filter(req => {
-        const matchesStatus = filterStatus === 'all' || req.status?.toLowerCase() === filterStatus.toLowerCase();
-        const matchesSearch = !searchTerm ||
-            req.requesterName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            req.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            req.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            req.items?.some(item => item.itemName?.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredRequisitions = useMemo(() => {
+        let filtered = [...requisitions];
 
-        return matchesStatus && matchesSearch;
-    });
+        if (filterStatus !== 'all') {
+            filtered = filtered.filter(req => req.status?.toLowerCase() === filterStatus.toLowerCase());
+        }
 
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = filteredRequisitions.slice(indexOfFirstItem, indexOfLastItem);
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(req =>
+                req.requesterName?.toLowerCase().includes(term) ||
+                req.department?.toLowerCase().includes(term) ||
+                req.notes?.toLowerCase().includes(term) ||
+                req.items?.some(item => item.itemName?.toLowerCase().includes(term))
+            );
+        }
+
+        return filtered;
+    }, [requisitions, filterStatus, searchTerm]);
+
+    const paginatedRequests = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredRequisitions.slice(start, start + itemsPerPage);
+    }, [filteredRequisitions, currentPage, itemsPerPage]);
+
     const totalPages = Math.ceil(filteredRequisitions.length / itemsPerPage);
 
-    const formatDate = (dateString) => {
+    const formatDate = useCallback((dateString) => {
         if (!dateString) return 'N/A';
         try {
             return new Date(dateString).toLocaleDateString('en-US', {
@@ -283,32 +284,38 @@ const RequestApproval = () => {
         } catch {
             return 'Invalid date';
         }
-    };
+    }, []);
 
-    const getStatusBadge = (status) => {
-        const statusLower = status?.toLowerCase() || '';
+    const formatCurrency = useCallback((amount) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'PHP',
+            minimumFractionDigits: 2
+        }).format(amount || 0);
+    }, []);
 
-        switch (statusLower) {
-            case 'pending':
-                return <span className="badge badge-pending">Pending</span>;
-            case 'approved':
-                return <span className="badge badge-approved">Approved</span>;
-            case 'rejected':
-                return <span className="badge badge-rejected">Rejected</span>;
-            case 'issued':
-                return <span className="badge badge-issued">Issued</span>;
-            default:
-                return <span className="badge">{status}</span>;
-        }
-    };
+    const getStatusBadge = useCallback((status) => {
+        const normalizedStatus = (status || '').toLowerCase();
+        const badges = {
+            pending: { class: 'badge-pending', text: 'Pending', icon: '⏳' },
+            approved: { class: 'badge-approved', text: 'Approved', icon: '✓' },
+            rejected: { class: 'badge-rejected', text: 'Rejected', icon: '✗' },
+            issued: { class: 'badge-issued', text: 'Issued', icon: '📦' }
+        };
+        const config = badges[normalizedStatus] || { class: 'badge-default', text: status || 'Unknown', icon: '?' };
+        return (
+            <span className={`status-badge ${config.class}`}>
+                <span className="badge-icon">{config.icon}</span>
+                {config.text}
+            </span>
+        );
+    }, []);
 
     if (loading && requisitions.length === 0) {
         return (
             <div className="loading-container">
-                <div className="loading-content">
-                    <div className="spinner-large"></div>
-                    <p className="loading-text">Loading requisitions...</p>
-                </div>
+                <div className="loading-spinner"></div>
+                <p className="loading-text">Loading requisitions...</p>
             </div>
         );
     }
@@ -317,295 +324,251 @@ const RequestApproval = () => {
         <div className="request-approval-container">
             <div className="request-approval-wrapper">
                 {/* Header */}
-                <div className="request-header">
-                    <h1 className="request-title">Request Approval</h1>
-                    <p className="request-subtitle">
-                        Review and approve pending requisitions. Approved requests will be queued for Admin to issue.
-                    </p>
-                    {user && (
-                        <div className="user-info-badge">
-                            <span>Logged in as: <strong>{user.fullName}</strong> (Role: {user.role})</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Stats Cards */}
-                <div className="stats-grid">
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div>
-                                <p className="stat-label">Pending</p>
-                                <p className="stat-value stat-value-pending">{stats.pending}</p>
-                            </div>
-                            <div className={`stat-decoration stat-decoration-pending`}></div>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div>
-                                <p className="stat-label">Approved</p>
-                                <p className="stat-value stat-value-approved">{stats.approved}</p>
-                            </div>
-                            <div className={`stat-decoration stat-decoration-approved`}></div>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div>
-                                <p className="stat-label">Rejected</p>
-                                <p className="stat-value stat-value-rejected">{stats.rejected}</p>
-                            </div>
-                            <div className={`stat-decoration stat-decoration-rejected`}></div>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div>
-                                <p className="stat-label">Issued</p>
-                                <p className="stat-value stat-value-issued">{stats.issued}</p>
-                            </div>
-                            <div className={`stat-decoration stat-decoration-issued`}></div>
-                        </div>
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">Request Approval</h1>
+                        <p className="page-subtitle">
+                            Review and approve pending requisitions. Approved requests will be queued for Admin to issue.
+                        </p>
                     </div>
                 </div>
 
                 {/* Filters and Search */}
-                <div className="filters-card">
-                    <div className="filters-wrapper">
-                        <div className="search-wrapper">
-                            <input
-                                type="text"
-                                placeholder="Search by requester, department, or item..."
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="search-input"
-                            />
-                        </div>
-                        <div className="filter-buttons">
-                            {['pending', 'approved', 'rejected', 'issued', 'all'].map(status => (
-                                <button
-                                    key={status}
-                                    onClick={() => {
-                                        setFilterStatus(status);
-                                        setCurrentPage(1);
-                                    }}
-                                    className={`filter-btn ${filterStatus === status ? 'filter-btn-active' : ''}`}
-                                >
-                                    {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-                                </button>
-                            ))}
-                        </div>
+                <div className="filter-section">
+                    <div className="filter-tabs">
+                        {['pending', 'approved', 'rejected', 'issued', 'all'].map(status => (
+                            <button
+                                key={status}
+                                onClick={() => { setFilterStatus(status); setCurrentPage(1); }}
+                                className={`filter-tab ${filterStatus === status ? 'active' : ''}`}
+                            >
+                                {status === 'all' ? 'All Requests' : status.charAt(0).toUpperCase() + status.slice(1)}
+                                {status !== 'all' && (
+                                    <span className="filter-count">({stats[status] || 0})</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="search-wrapper">
+                        <span className="search-icon">🔍</span>
+                        <input
+                            type="text"
+                            placeholder="Search by requester, department, or item..."
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            className="search-input"
+                        />
+                        {searchTerm && (
+                            <button className="clear-search" onClick={() => setSearchTerm('')}>✕</button>
+                        )}
                     </div>
                 </div>
 
                 {/* Error Message */}
                 {error && (
-                    <div className="error-message">
-                        Error: {error}
+                    <div className="alert-error">
+                        <span className="alert-icon">⚠️</span>
+                        <span className="alert-message">{error}</span>
                     </div>
                 )}
 
-                {/* Requisitions Table */}
-                <div className="table-card">
-                    <div className="table-header">
-                        <h2>Requisitions ({filteredRequisitions.length})</h2>
+                {/* Requisitions Grid */}
+                {filteredRequisitions.length === 0 ? (
+                    <div className="empty-state">
+                        <div className="empty-icon">📋</div>
+                        <h3 className="empty-title">No Requisitions Found</h3>
+                        <p className="empty-description">
+                            {searchTerm ? 'Try adjusting your search or filters' : 'No requisitions match the selected status'}
+                        </p>
                     </div>
+                ) : (
+                    <>
+                        <div className="requests-grid">
+                            {paginatedRequests.map(req => {
+                                const totalQuantity = req.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+                                const totalValue = req.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
+                                const isPending = req.status?.toLowerCase() === 'pending';
+                                const employeeDisplayId = getEmployeeDisplayId(req);
 
-                    {filteredRequisitions.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="empty-state-icon">📋</div>
-                            <h3 className="empty-state-title">No Requisitions Found</h3>
-                            <p className="empty-state-text">
-                                {searchTerm ? 'Try adjusting your search or filters' : 'No requisitions match the selected status'}
-                            </p>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="table-wrapper">
-                                <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Requester</th>
-                                            <th>Department</th>
-                                            <th>Items</th>
-                                            <th className="text-right">Total Qty</th>
-                                            <th className="text-center">Status</th>
-                                            <th>Date</th>
-                                            <th className="text-center">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {currentItems.map(req => {
-                                            const totalQuantity = req.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-                                            const isPending = req.status?.toLowerCase() === 'pending';
-                                            const employeeDisplayId = getEmployeeDisplayId(req);
+                                return (
+                                    <div key={req._id} className={`request-card ${req.status?.toLowerCase()}`}>
+                                        {/* Card Header */}
+                                        <div className="card-header">
+                                            <div className="requester-info">
+                                                <h3 className="requester-name">{req.requesterName || req.requester?.name || 'Unknown'}</h3>
+                                                <p className="requester-dept">{req.department || 'N/A'}</p>
+                                                <p className="requester-id">ID: {employeeDisplayId}</p>
+                                            </div>
+                                            {getStatusBadge(req.status)}
+                                        </div>
 
-                                            return (
-                                                <tr
-                                                    key={req._id}
+                                        {/* Card Content */}
+                                        <div className="card-content">
+                                            {/* Items Preview */}
+                                            <div className="items-preview">
+                                                <p className="items-label">Requested Items:</p>
+                                                <div className="items-list">
+                                                    {req.items?.slice(0, 2).map((item, idx) => (
+                                                        <div key={idx} className="item-row">
+                                                            <span className="item-name">{item.itemName}</span>
+                                                            <span className="item-qty">{item.quantity} {item.unit || 'pcs'}</span>
+                                                        </div>
+                                                    ))}
+                                                    {req.items?.length > 2 && (
+                                                        <p className="more-items">+{req.items.length - 2} more items</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Stats */}
+                                            <div className="card-stats">
+                                                <div className="stat">
+                                                    <span className="stat-label">Items</span>
+                                                    <span className="stat-value">{req.items?.length || 0}</span>
+                                                </div>
+                                                <div className="stat">
+                                                    <span className="stat-label">Total Qty</span>
+                                                    <span className="stat-value">{totalQuantity}</span>
+                                                </div>
+                                                <div className="stat">
+                                                    <span className="stat-label">Total Value</span>
+                                                    <span className="stat-value">{formatCurrency(totalValue)}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Notes */}
+                                            {req.notes && (
+                                                <div className="notes-section">
+                                                    <p className="notes-label">📝 Notes:</p>
+                                                    <p className="notes-text">{req.notes}</p>
+                                                </div>
+                                            )}
+
+                                            {/* Action Buttons */}
+                                            <div className="card-actions">
+                                                <button
                                                     onClick={() => {
                                                         setSelectedRequest(req);
                                                         setShowDetailsModal(true);
                                                     }}
+                                                    className="btn-view"
                                                 >
-                                                    <td>
-                                                        <div className="requester-name">
-                                                            {req.requesterName || req.requester?.name || 'Unknown'}
-                                                        </div>
-                                                        <div className="requester-id">
-                                                            ID: {employeeDisplayId}
-                                                        </div>
-                                                    </td>
-                                                    <td className="department-cell">
-                                                        {req.department || 'N/A'}
-                                                    </td>
-                                                    <td>
-                                                        <div className="items-count">{req.items?.length || 0} item(s)</div>
-                                                        <div className="items-preview">
-                                                            {req.items?.map(i => i.itemName).slice(0, 2).join(', ')}
-                                                            {req.items?.length > 2 && '...'}
-                                                        </div>
-                                                    </td>
-                                                    <td className="quantity-value text-right">
-                                                        {totalQuantity}
-                                                    </td>
-                                                    <td className="text-center">
-                                                        {getStatusBadge(req.status)}
-                                                    </td>
-                                                    <td className="date-value">
-                                                        {formatDate(req.createdAt || req.dateRequested)}
-                                                    </td>
-                                                    <td className="text-center">
-                                                        {isPending && (
-                                                            <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSelectedRequest(req);
-                                                                        setShowApproveModal(true);
-                                                                    }}
-                                                                    className="action-btn btn-approve"
-                                                                    disabled={processingId === req._id}
-                                                                >
-                                                                    Approve
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSelectedRequest(req);
-                                                                        setShowRejectModal(true);
-                                                                    }}
-                                                                    className="action-btn btn-reject"
-                                                                    disabled={processingId === req._id}
-                                                                >
-                                                                    Reject
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        {!isPending && (
-                                                            <span className="processed-badge">Processed</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                    View Details
+                                                </button>
+                                                {isPending && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedRequest(req);
+                                                                setShowApproveModal(true);
+                                                            }}
+                                                            disabled={processingId === req._id}
+                                                            className="btn-approve-card"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedRequest(req);
+                                                                setShowRejectModal(true);
+                                                            }}
+                                                            disabled={processingId === req._id}
+                                                            className="btn-reject-card"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
 
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="pagination-wrapper">
-                                    <div className="pagination-info">
-                                        Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredRequisitions.length)} of {filteredRequisitions.length} requisitions
-                                    </div>
-                                    <div className="pagination-controls">
-                                        <button
-                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                            disabled={currentPage === 1}
-                                            className="pagination-btn"
-                                        >
-                                            Previous
-                                        </button>
-                                        <span className="pagination-page">
-                                            Page {currentPage} of {totalPages}
-                                        </span>
-                                        <button
-                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                            disabled={currentPage === totalPages}
-                                            className="pagination-btn"
-                                        >
-                                            Next
-                                        </button>
-                                    </div>
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="pagination-wrapper">
+                                <div className="pagination-info">
+                                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredRequisitions.length)} of {filteredRequisitions.length} requisitions
                                 </div>
-                            )}
-                        </>
-                    )}
-                </div>
+                                <div className="pagination-controls">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        className="pagination-btn"
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="pagination-page">Page {currentPage} of {totalPages}</span>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        className="pagination-btn"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Details Modal */}
             {showDetailsModal && selectedRequest && (
                 <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-                    <div className="modal-content modal-content-wide" onClick={e => e.stopPropagation()}>
-                        <div className="modal-sticky-header">
-                            <div className="modal-header-flex">
-                                <div>
-                                    <h2 className="modal-title">Requisition Details</h2>
-                                    <div className="modal-badge-group">
-                                        {getStatusBadge(selectedRequest.status)}
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowDetailsModal(false)}
-                                    className="modal-close"
-                                >
-                                    ×
-                                </button>
-                            </div>
+                    <div className="modal-container modal-large" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Requisition Details</h2>
+                            <button className="modal-close" onClick={() => setShowDetailsModal(false)}>×</button>
                         </div>
 
                         <div className="modal-body">
+                            <div className="modal-status">
+                                {getStatusBadge(selectedRequest.status)}
+                            </div>
+
                             {/* Requester Info */}
                             <div className="info-section">
                                 <h3 className="section-title">Requester Information</h3>
                                 <div className="info-grid">
-                                    <div>
-                                        <p className="info-label">Name</p>
-                                        <p className="info-value">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</p>
+                                    <div className="info-item">
+                                        <label>Name</label>
+                                        <p>{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</p>
                                     </div>
-                                    <div>
-                                        <p className="info-label">Employee ID</p>
-                                        <p className="info-value">{getEmployeeDisplayId(selectedRequest)}</p>
+                                    <div className="info-item">
+                                        <label>Employee ID</label>
+                                        <p>{getEmployeeDisplayId(selectedRequest)}</p>
                                     </div>
-                                    <div>
-                                        <p className="info-label">Department</p>
-                                        <p className="info-value">{selectedRequest.department || 'N/A'}</p>
+                                    <div className="info-item">
+                                        <label>Department</label>
+                                        <p>{selectedRequest.department || 'N/A'}</p>
                                     </div>
-                                    <div>
-                                        <p className="info-label">Date Requested</p>
-                                        <p className="info-value">{formatDate(selectedRequest.createdAt || selectedRequest.dateRequested)}</p>
+                                    <div className="info-item">
+                                        <label>Date Requested</label>
+                                        <p>{formatDate(selectedRequest.createdAt || selectedRequest.dateRequested)}</p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Notes/Purpose */}
+                            {/* Notes */}
                             {selectedRequest.notes && (
                                 <div className="notes-section">
                                     <h3 className="section-title">Notes / Purpose</h3>
-                                    <p className="notes-content">
-                                        {selectedRequest.notes}
-                                    </p>
+                                    <p className="notes-content">{selectedRequest.notes}</p>
                                 </div>
                             )}
 
-                            {/* Items */}
+                            {/* Items Table */}
                             <div>
                                 <h3 className="section-title">Requested Items</h3>
-                                <div className="items-table-wrapper">
-                                    <table className="items-table">
+                                <div className="table-wrapper">
+                                    <table className="details-table">
                                         <thead>
                                             <tr>
                                                 <th>Item Name</th>
@@ -619,28 +582,24 @@ const RequestApproval = () => {
                                         <tbody>
                                             {selectedRequest.items?.map((item, idx) => (
                                                 <tr key={idx}>
-                                                    <td>{item.itemName}</td>
+                                                    <td className="item-name-cell">{item.itemName}</td>
                                                     <td>{item.category || '—'}</td>
                                                     <td>{item.unit || '—'}</td>
                                                     <td className="text-right">{item.quantity}</td>
-                                                    <td className="text-right">
-                                                        {item.unitPrice ? `$${item.unitPrice.toFixed(2)}` : '—'}
-                                                    </td>
-                                                    <td className="text-right font-semibold">
-                                                        {item.totalPrice ? `$${item.totalPrice.toFixed(2)}` : '—'}
-                                                    </td>
+                                                    <td className="text-right">{formatCurrency(item.unitPrice)}</td>
+                                                    <td className="text-right total-cell">{formatCurrency(item.totalPrice)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         <tfoot>
-                                            <tr>
-                                                <td colSpan="3" className="text-right font-semibold">Totals:</td>
-                                                <td className="text-right font-semibold">
+                                            <tr className="total-row">
+                                                <td colSpan="3" className="text-right">Totals:</td>
+                                                <td className="text-right">
                                                     {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
                                                 </td>
                                                 <td className="text-right">—</td>
-                                                <td className="text-right font-semibold">
-                                                    ${selectedRequest.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2) || '0.00'}
+                                                <td className="text-right total-value">
+                                                    {formatCurrency(selectedRequest.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0))}
                                                 </td>
                                             </tr>
                                         </tfoot>
@@ -649,29 +608,31 @@ const RequestApproval = () => {
                             </div>
                         </div>
 
-                        {/* Actions */}
-                        {selectedRequest.status?.toLowerCase() === 'pending' && (
-                            <div className="modal-footer">
-                                <button
-                                    onClick={() => {
-                                        setShowDetailsModal(false);
-                                        setShowRejectModal(true);
-                                    }}
-                                    className="action-btn btn-reject"
-                                >
-                                    Reject
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowDetailsModal(false);
-                                        setShowApproveModal(true);
-                                    }}
-                                    className="action-btn btn-approve"
-                                >
-                                    Approve
-                                </button>
-                            </div>
-                        )}
+                        <div className="modal-footer">
+                            {selectedRequest.status?.toLowerCase() === 'pending' && (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setShowDetailsModal(false);
+                                            setShowRejectModal(true);
+                                        }}
+                                        className="btn-reject"
+                                    >
+                                        Reject
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowDetailsModal(false);
+                                            setShowApproveModal(true);
+                                        }}
+                                        className="btn-approve"
+                                    >
+                                        Approve
+                                    </button>
+                                </>
+                            )}
+                            <button className="btn-secondary" onClick={() => setShowDetailsModal(false)}>Close</button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -679,20 +640,32 @@ const RequestApproval = () => {
             {/* Approve Modal */}
             {showApproveModal && selectedRequest && (
                 <div className="modal-overlay" onClick={() => setShowApproveModal(false)}>
-                    <div className="modal-content modal-content-medium" onClick={e => e.stopPropagation()}>
-                        <div className="modal-body">
-                            <div className="modal-header-simple">
-                                <h2 className="modal-title">Approve Requisition</h2>
-                                <p className="modal-subtitle">Review the details before approving</p>
-                            </div>
+                    <div className="modal-container" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Approve Requisition</h2>
+                            <button className="modal-close" onClick={() => setShowApproveModal(false)}>×</button>
+                        </div>
 
-                            <div className="requirement-summary">
-                                <p className="requester-info">
-                                    Approve requisition from <strong>{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</strong>
-                                </p>
-                                <p className="requester-details">
-                                    Employee ID: {getEmployeeDisplayId(selectedRequest)} | Items: {selectedRequest.items?.length || 0} | Total Qty: {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)}
-                                </p>
+                        <div className="modal-body">
+                            <div className="approve-info">
+                                <div className="approve-recipient">
+                                    <span className="approve-label">Requester:</span>
+                                    <span className="approve-value">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</span>
+                                </div>
+                                <div className="approve-details">
+                                    <span className="approve-label">Employee ID:</span>
+                                    <span className="approve-value">{getEmployeeDisplayId(selectedRequest)}</span>
+                                </div>
+                                <div className="approve-details">
+                                    <span className="approve-label">Items:</span>
+                                    <span className="approve-value">{selectedRequest.items?.length || 0} items</span>
+                                </div>
+                                <div className="approve-details">
+                                    <span className="approve-label">Total Quantity:</span>
+                                    <span className="approve-value">
+                                        {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                                    </span>
+                                </div>
                             </div>
 
                             <div className="form-group">
@@ -700,37 +673,25 @@ const RequestApproval = () => {
                                 <textarea
                                     value={remarks}
                                     onChange={(e) => setRemarks(e.target.value)}
-                                    rows="3"
-                                    className="textarea-input"
+                                    rows={3}
+                                    className="form-textarea"
                                     placeholder="Add any remarks..."
                                 />
                             </div>
+                        </div>
 
-                            <div className="modal-footer">
-                                <button
-                                    onClick={() => {
-                                        setShowApproveModal(false);
-                                        setRemarks('');
-                                    }}
-                                    className="btn-secondary"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleApprove}
-                                    disabled={processingId === selectedRequest._id}
-                                    className="action-btn btn-approve"
-                                >
-                                    {processingId === selectedRequest._id ? (
-                                        <>
-                                            <span className="spinner-small"></span>
-                                            Approving...
-                                        </>
-                                    ) : (
-                                        'Confirm Approval'
-                                    )}
-                                </button>
-                            </div>
+                        <div className="modal-footer">
+                            <button className="btn-secondary" onClick={() => { setShowApproveModal(false); setRemarks(''); }}>Cancel</button>
+                            <button className="btn-approve" onClick={handleApprove} disabled={processingId === selectedRequest._id}>
+                                {processingId === selectedRequest._id ? (
+                                    <>
+                                        <span className="spinner-small"></span>
+                                        Approving...
+                                    </>
+                                ) : (
+                                    'Confirm Approval'
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -739,20 +700,22 @@ const RequestApproval = () => {
             {/* Reject Modal */}
             {showRejectModal && selectedRequest && (
                 <div className="modal-overlay" onClick={() => setShowRejectModal(false)}>
-                    <div className="modal-content modal-content-medium" onClick={e => e.stopPropagation()}>
-                        <div className="modal-body">
-                            <div className="modal-header-simple">
-                                <h2 className="modal-title">Reject Requisition</h2>
-                                <p className="modal-subtitle">Please provide a reason for rejection</p>
-                            </div>
+                    <div className="modal-container" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Reject Requisition</h2>
+                            <button className="modal-close" onClick={() => setShowRejectModal(false)}>×</button>
+                        </div>
 
-                            <div className="requirement-summary">
-                                <p className="requester-info">
-                                    Reject requisition from <strong>{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</strong>
-                                </p>
-                                <p className="requester-details">
-                                    Employee ID: {getEmployeeDisplayId(selectedRequest)}
-                                </p>
+                        <div className="modal-body">
+                            <div className="reject-info">
+                                <div className="reject-recipient">
+                                    <span className="reject-label">Requester:</span>
+                                    <span className="reject-value">{selectedRequest.requesterName || selectedRequest.requester?.name || 'Unknown'}</span>
+                                </div>
+                                <div className="reject-details">
+                                    <span className="reject-label">Employee ID:</span>
+                                    <span className="reject-value">{getEmployeeDisplayId(selectedRequest)}</span>
+                                </div>
                             </div>
 
                             <div className="form-group">
@@ -762,38 +725,25 @@ const RequestApproval = () => {
                                 <textarea
                                     value={remarks}
                                     onChange={(e) => setRemarks(e.target.value)}
-                                    rows="3"
-                                    className="textarea-input"
-                                    placeholder="Please provide a reason..."
-                                    required
+                                    rows={4}
+                                    className="form-textarea"
+                                    placeholder="Please provide a reason for rejection..."
                                 />
                             </div>
+                        </div>
 
-                            <div className="modal-footer">
-                                <button
-                                    onClick={() => {
-                                        setShowRejectModal(false);
-                                        setRemarks('');
-                                    }}
-                                    className="btn-secondary"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleReject}
-                                    disabled={!remarks || processingId === selectedRequest._id}
-                                    className="action-btn btn-reject"
-                                >
-                                    {processingId === selectedRequest._id ? (
-                                        <>
-                                            <span className="spinner-small"></span>
-                                            Rejecting...
-                                        </>
-                                    ) : (
-                                        'Confirm Rejection'
-                                    )}
-                                </button>
-                            </div>
+                        <div className="modal-footer">
+                            <button className="btn-secondary" onClick={() => { setShowRejectModal(false); setRemarks(''); }}>Cancel</button>
+                            <button className="btn-reject" onClick={handleReject} disabled={!remarks || processingId === selectedRequest._id}>
+                                {processingId === selectedRequest._id ? (
+                                    <>
+                                        <span className="spinner-small"></span>
+                                        Rejecting...
+                                    </>
+                                ) : (
+                                    'Confirm Rejection'
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>

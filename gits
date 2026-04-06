@@ -1,0 +1,12 @@
+[33mcommit 078b41153b6ea3721c0703c8c711a47d2572eae3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Sexeyi <151999155+Sexeyi@users.noreply.github.com>
+Date:   Thu Mar 5 14:35:09 2026 +0800
+
+    will be needed to clean the code and have a better
+    ui and function then connect it properly to database
+
+[33mcommit ea74c633f72658f4521dca05ec3ffc07f91e659b[m
+Author: Sexeyi <151999155+Sexeyi@users.noreply.github.com>
+Date:   Thu Mar 5 14:31:57 2026 +0800
+
+    `Added mongoose connection and express app setup`

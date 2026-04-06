@@ -159,8 +159,7 @@ const Sidebar = ({
           <img src={Logo} alt="PSA Logo" className="psa-logo" />
           {!collapsed && (
             <div className="title-wrapper">
-              <span className="title-text">Philippine Statistics</span>
-              <span className="title-subtext">Authority</span>
+              <span className="title-text">Philippine Statistics Authority</span>
             </div>
           )}
         </div>
@@ -185,7 +184,7 @@ const Sidebar = ({
         ))}
       </ul>
 
-      {/* Logout button at bottom */}
+      {/* Logout button */}
       <div className="sidebar-logout">
         <li
           className="logout-item"
@@ -197,21 +196,24 @@ const Sidebar = ({
         </li>
       </div>
 
+      {/* User Profile Footer */}
       {userRole && (
         <div className="sidebar-footer">
           {!collapsed ? (
-            <div className="user-info">
+            <div className="user-profile">
               <div className="user-avatar">
-                {user?.fullName?.charAt(0) || userRole.charAt(0)}
+                {user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0)}
               </div>
-              <div className="user-details">
+              <div className="user-info">
                 <span className="user-name">{user?.fullName || 'User'}</span>
-                <span className="user-role">{userRole}</span>
+                <span className="user-email">{user?.email || 'user@psa.gov.ph'}</span>
               </div>
             </div>
           ) : (
-            <div className="user-avatar-small" title={userRole}>
-              {user?.fullName?.charAt(0) || userRole.charAt(0)}
+            <div className="user-profile-collapsed" title={user?.fullName || userRole}>
+              <div className="user-avatar-small">
+                {user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0)}
+              </div>
             </div>
           )}
         </div>
