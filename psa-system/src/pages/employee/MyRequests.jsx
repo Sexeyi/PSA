@@ -169,7 +169,7 @@ const MyRequests = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            setSuccessMessage("✅ Requisition submitted successfully!");
+            setSuccessMessage("Requisition submitted successfully!");
 
             setItems([{
                 id: 1,
@@ -240,7 +240,7 @@ const MyRequests = () => {
 
                 {errorMessage && (
                     <div className="alert alert-error">
-                        <span className="alert-icon">⚠</span>
+                        <span className="alert-icon">!</span>
                         <span>{errorMessage}</span>
                     </div>
                 )}
@@ -250,9 +250,6 @@ const MyRequests = () => {
                     <div className="card">
                         <div className="card-header">
                             <h3 className="card-title">Request Items</h3>
-                            <p className="card-description">
-                                Add the items you need to request. Unit prices are automatically populated from inventory.
-                            </p>
                         </div>
                         <div className="card-content">
                             <div className="table-container">
@@ -281,7 +278,6 @@ const MyRequests = () => {
                                                             placeholder="Search inventory..."
                                                             autoComplete="off"
                                                         />
-                                                        <span className="search-icon">🔍</span>
                                                         <datalist id={`inventory-list-${index}`}>
                                                             {inventoryItems.map(invItem => (
                                                                 <option key={invItem._id} value={invItem.name || invItem.itemName}>
@@ -343,7 +339,7 @@ const MyRequests = () => {
                                                             className="remove-btn"
                                                             title="Remove item"
                                                         >
-                                                            🗑️
+                                                            ×
                                                         </button>
                                                     )}
                                                 </td>
@@ -390,21 +386,18 @@ const MyRequests = () => {
                     {/* Stats Cards */}
                     <div className="stats-grid">
                         <div className="stat-card">
-                            <div className="stat-icon">📦</div>
                             <div>
                                 <p className="stat-label">Total Items</p>
                                 <p className="stat-value">{items.length}</p>
                             </div>
                         </div>
                         <div className="stat-card">
-                            <div className="stat-icon">📊</div>
                             <div>
                                 <p className="stat-label">Total Quantity</p>
                                 <p className="stat-value">{calculateTotalQuantity()}</p>
                             </div>
                         </div>
                         <div className="stat-card">
-                            <div className="stat-icon">💰</div>
                             <div>
                                 <p className="stat-label">Overall Total</p>
                                 <p className="stat-value stat-value-primary">{formatCurrency(calculateOverallTotal())}</p>

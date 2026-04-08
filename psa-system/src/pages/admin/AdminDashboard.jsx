@@ -151,7 +151,6 @@ const AdminDashboard = ({ user }) => {
     if (error) {
         return (
             <div className="dashboard-error">
-                <div className="error-icon">⚠️</div>
                 <h3>Error Loading Dashboard</h3>
                 <p>{error}</p>
                 <button onClick={fetchAllData} className="retry-btn">Retry</button>
@@ -163,7 +162,7 @@ const AdminDashboard = ({ user }) => {
         <div className="admin-dashboard">
             <div className="dashboard-header">
                 <div>
-                    <h1 className="dashboard-title">Welcome back, {user?.fullName || 'Admin'}!</h1>
+                    <h1 className="dashboard-title">Welcome back, {user?.fullName || 'Admin'}</h1>
                     <p className="dashboard-subtitle">Here's what's happening with your inventory today.</p>
                 </div>
                 <div className="dashboard-date">
@@ -173,43 +172,37 @@ const AdminDashboard = ({ user }) => {
 
             {/* Stats Grid */}
             <div className="stats-grid">
-                <div className="stat-card stat-inventory">
-                    <div className="stat-icon">📦</div>
+                <div className="stat-card">
                     <div className="stat-info">
                         <span className="stat-label">Total Inventory Items</span>
                         <span className="stat-value">{stats.totalInventory}</span>
                     </div>
                 </div>
-                <div className="stat-card stat-value">
-                    <div className="stat-icon">💰</div>
+                <div className="stat-card">
                     <div className="stat-info">
                         <span className="stat-label">Total Inventory Value</span>
                         <span className="stat-value">{formatCurrency(stats.totalValue)}</span>
                     </div>
                 </div>
-                <div className="stat-card stat-lowstock">
-                    <div className="stat-icon">⚠️</div>
+                <div className="stat-card">
                     <div className="stat-info">
                         <span className="stat-label">Low Stock Items</span>
                         <span className="stat-value">{stats.lowStock}</span>
                     </div>
                 </div>
-                <div className="stat-card stat-pending">
-                    <div className="stat-icon">⏳</div>
+                <div className="stat-card">
                     <div className="stat-info">
                         <span className="stat-label">Pending Requests</span>
                         <span className="stat-value">{stats.pendingRequests}</span>
                     </div>
                 </div>
-                <div className="stat-card stat-approved">
-                    <div className="stat-icon">✓</div>
+                <div className="stat-card">
                     <div className="stat-info">
                         <span className="stat-label">Approved</span>
                         <span className="stat-value">{stats.approvedRequests}</span>
                     </div>
                 </div>
-                <div className="stat-card stat-issued">
-                    <div className="stat-icon">📦</div>
+                <div className="stat-card">
                     <div className="stat-info">
                         <span className="stat-label">Issued</span>
                         <span className="stat-value">{stats.issuedRequests}</span>
@@ -278,34 +271,6 @@ const AdminDashboard = ({ user }) => {
                             </div>
                         )}
                     </div>
-                </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="quick-actions">
-                <h3 className="section-title">Quick Actions</h3>
-                <div className="actions-grid">
-                    <button onClick={() => window.location.href = '/requisitions'} className="action-card">
-                        <div className="action-icon">📋</div>
-                        <div className="action-info">
-                            <h4>Review Requests</h4>
-                            <p>Process pending requisitions</p>
-                        </div>
-                    </button>
-                    <button onClick={() => window.location.href = '/inventory'} className="action-card">
-                        <div className="action-icon">📦</div>
-                        <div className="action-info">
-                            <h4>Manage Inventory</h4>
-                            <p>Update stock levels</p>
-                        </div>
-                    </button>
-                    <button onClick={() => window.location.href = '/profile'} className="action-card">
-                        <div className="action-icon">👤</div>
-                        <div className="action-info">
-                            <h4>My Profile</h4>
-                            <p>Update account settings</p>
-                        </div>
-                    </button>
                 </div>
             </div>
         </div>

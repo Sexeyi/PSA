@@ -273,15 +273,6 @@ const SuperAdminDashboard = () => {
     return 'Good evening';
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
-
-  const handleProfile = () => {
-    navigate('/profile');
-  };
-
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showProfileMenu && !event.target.closest('.profile-menu')) {
@@ -341,48 +332,6 @@ const SuperAdminDashboard = () => {
                 day: 'numeric'
               })}
             </p>
-          </div>
-
-          {/* Profile Dropdown */}
-          <div className="profile-menu">
-            <button
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex-center gap-3 hover-bg-secondary px-3 py-2 rounded-lg transition-all"
-            >
-              <div className="card-icon" style={{ background: 'rgba(2, 62, 138, 0.1)' }}>
-                <span style={{ fontSize: '1.25rem' }}>
-                  {user.fullName?.charAt(0) || 'A'}
-                </span>
-              </div>
-              <div className="text-left hidden sm:block">
-                <p className="font-medium text-primary">{user.fullName}</p>
-                <p className="text-xs text-secondary capitalize">{user.role}</p>
-              </div>
-              <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-            {showProfileMenu && (
-              <div className="profile-dropdown">
-                <div className="profile-dropdown-header">
-                  <p className="font-semibold">{user.fullName}</p>
-                  <p className="text-sm text-secondary mt-1">{user.email}</p>
-                  <p className="text-xs text-secondary mt-1 capitalize">{user.role}</p>
-                </div>
-                <div className="profile-dropdown-actions">
-                  <button onClick={handleProfile} className="dropdown-item">
-                    My Profile
-                  </button>
-                </div>
-                <div className="dropdown-divider"></div>
-                <div className="profile-dropdown-actions">
-                  <button onClick={handleLogout} className="dropdown-item text-danger">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -1,104 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import './EmployeeDashboard.css';
 
-// Simple icon components
-const IconClock = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-);
-
-const IconCheckCircle = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-);
-
-const IconXCircle = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-);
-
-const IconSearch = () => (
-    <svg className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-);
-
-const IconCalendar = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-);
-
-const IconRefresh = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-);
-
-const IconDownload = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-    </svg>
-);
-
-const IconBell = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-    </svg>
-);
-
-const IconChevronLeft = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-    </svg>
-);
-
-const IconChevronRight = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-);
-
-const IconTrendingUp = () => (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-);
-
-const IconTrendingDown = () => (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-    </svg>
-);
-
-const daysAgoLabel = (date) => {
-    if (!date) return "N/A";
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    const diff = Math.floor((today - d) / 86400000);
-
-    if (diff === 0) return "Today";
-    if (diff === 1) return "Yesterday";
-    if (diff < 7) return `${diff} days ago`;
-    if (diff < 30) return `${Math.floor(diff / 7)} weeks ago`;
-    return `${Math.floor(diff / 30)} months ago`;
-};
-
-const formatDateTime = (date) => {
-    if (!date) return "N/A";
-    return new Date(date).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-};
-
 export default function EmployeeDashboard() {
     const [user, setUser] = useState(null);
     const [requisitions, setRequisitions] = useState([]);
@@ -111,7 +13,6 @@ export default function EmployeeDashboard() {
     const [sortOrder, setSortOrder] = useState("desc");
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState(new Date());
     const [viewMode, setViewMode] = useState("list");
 
     // Get user data
@@ -120,7 +21,6 @@ export default function EmployeeDashboard() {
         const token = localStorage.getItem('token');
 
         if (!userData || !token) {
-            // navigate('/login'); - Add navigation if needed
             return;
         }
 
@@ -143,8 +43,7 @@ export default function EmployeeDashboard() {
 
             if (!response.ok) throw new Error("Failed to fetch requisitions");
             const data = await response.json();
-            setRequisitions(Array.isArray(data) ? data : []);
-            setLastUpdated(new Date());
+            setRequisitions(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error("Fetch requisitions error:", error);
             setError('Failed to load requisitions. Please try again.');
@@ -164,12 +63,6 @@ export default function EmployeeDashboard() {
             return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         });
 
-        const lastMonth = requisitions.filter(r => {
-            const date = new Date(r.createdAt);
-            const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
-            return date.getMonth() === lastMonthDate.getMonth() && date.getFullYear() === lastMonthDate.getFullYear();
-        });
-
         const pending = requisitions.filter(r => r.status === "Pending");
         const approved = requisitions.filter(r => r.status === "Approved");
         const rejected = requisitions.filter(r => r.status === "Rejected");
@@ -180,7 +73,6 @@ export default function EmployeeDashboard() {
             approved: approved.length,
             rejected: rejected.length,
             thisMonth: thisMonth.length,
-            lastMonth: lastMonth.length,
             approvalRate: requisitions.length ? ((approved.length / requisitions.length) * 100).toFixed(1) : 0,
         };
     }, [requisitions]);
@@ -312,15 +204,6 @@ export default function EmployeeDashboard() {
         URL.revokeObjectURL(url);
     };
 
-    const handleLogout = () => {
-        localStorage.clear();
-        // navigate('/login'); - Add navigation if needed
-    };
-
-    const handleProfile = () => {
-        // navigate('/profile'); - Add navigation if needed
-    };
-
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (showProfileMenu && !event.target.closest('.profile-menu')) {
@@ -349,7 +232,6 @@ export default function EmployeeDashboard() {
             <div className="employee-dashboard">
                 <div className="flex-center" style={{ minHeight: '100vh' }}>
                     <div className="text-center">
-                        <div className="text-danger" style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
                         <h2 className="text-xl mb-2">Error Loading Dashboard</h2>
                         <p className="text-secondary mb-4">{error}</p>
                         <button onClick={fetchRequisitions} className="btn btn-primary">
@@ -376,57 +258,12 @@ export default function EmployeeDashboard() {
                             })}
                         </p>
                     </div>
-
-                    {/* Profile Dropdown */}
-                    <div className="profile-menu">
-                        <button
-                            onClick={() => setShowProfileMenu(!showProfileMenu)}
-                            className="flex-center gap-3 hover-bg-secondary px-3 py-2 rounded-lg transition-all"
-                        >
-                            <div className="card-icon" style={{ background: 'rgba(2, 62, 138, 0.1)' }}>
-                                <span style={{ fontSize: '1.25rem' }}>
-                                    {user?.fullName?.charAt(0) || 'E'}
-                                </span>
-                            </div>
-                            <div className="text-left hidden sm:block">
-                                <p className="font-medium text-primary">{user?.fullName || 'Employee'}</p>
-                                <p className="text-xs text-secondary capitalize">{user?.role || 'employee'}</p>
-                            </div>
-                            <svg className="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-
-                        {showProfileMenu && (
-                            <div className="profile-dropdown">
-                                <div className="profile-dropdown-header">
-                                    <p className="font-semibold">{user?.fullName}</p>
-                                    <p className="text-sm text-secondary mt-1">{user?.email}</p>
-                                    <p className="text-xs text-secondary mt-1 capitalize">{user?.role}</p>
-                                </div>
-                                <div className="profile-dropdown-actions">
-                                    <button onClick={handleProfile} className="dropdown-item">
-                                        My Profile
-                                    </button>
-                                </div>
-                                <div className="dropdown-divider"></div>
-                                <div className="profile-dropdown-actions">
-                                    <button onClick={handleLogout} className="dropdown-item text-danger">
-                                        Logout
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
 
             {/* KPI Cards */}
             <div className="dashboard-cards">
                 <div className="card">
-                    <div className="card-icon">
-                        <span>📋</span>
-                    </div>
                     <div className="card-content">
                         <h3>Total Requests</h3>
                         <div className="card-value">{stats.total}</div>
@@ -435,9 +272,6 @@ export default function EmployeeDashboard() {
                 </div>
 
                 <div className="card">
-                    <div className="card-icon" style={{ background: 'rgba(234, 179, 8, 0.1)' }}>
-                        <span>⏳</span>
-                    </div>
                     <div className="card-content">
                         <h3>Pending</h3>
                         <div className="card-value" style={{ color: '#eab308' }}>{stats.pending}</div>
@@ -446,9 +280,6 @@ export default function EmployeeDashboard() {
                 </div>
 
                 <div className="card">
-                    <div className="card-icon" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
-                        <span>✅</span>
-                    </div>
                     <div className="card-content">
                         <h3>Approved</h3>
                         <div className="card-value" style={{ color: '#22c55e' }}>{stats.approved}</div>
@@ -457,9 +288,6 @@ export default function EmployeeDashboard() {
                 </div>
 
                 <div className="card">
-                    <div className="card-icon" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
-                        <span>❌</span>
-                    </div>
                     <div className="card-content">
                         <h3>Rejected</h3>
                         <div className="card-value" style={{ color: '#ef4444' }}>{stats.rejected}</div>
@@ -480,14 +308,14 @@ export default function EmployeeDashboard() {
                                 className="icon-button"
                                 title="Refresh"
                             >
-                                <IconRefresh />
+                                ↻
                             </button>
                             <button
                                 onClick={handleExport}
                                 className="icon-button"
                                 title="Export"
                             >
-                                <IconDownload />
+                                ↓
                             </button>
                             <div className="view-toggle">
                                 <button
@@ -509,7 +337,7 @@ export default function EmployeeDashboard() {
                     {/* Filters */}
                     <div className="filters-section">
                         <div className="search-wrapper">
-                            <IconSearch />
+                            <span className="search-icon">🔍</span>
                             <input
                                 type="text"
                                 placeholder="Search by title or ID..."
@@ -636,7 +464,6 @@ export default function EmployeeDashboard() {
 
                         {filtered.length === 0 && (
                             <div className="empty-state">
-                                <div className="text-5xl mb-3">📭</div>
                                 <p className="text-secondary font-medium">No requests found</p>
                                 <p className="text-sm text-secondary mt-1">Try adjusting your search or filters</p>
                             </div>
@@ -660,7 +487,6 @@ export default function EmployeeDashboard() {
                     <div className="dashboard-section">
                         <div className="flex-between mb-4">
                             <div className="flex-center gap-2">
-                                <IconCalendar />
                                 <h2>Activity Calendar</h2>
                             </div>
                             <div className="flex gap-1">
@@ -668,13 +494,13 @@ export default function EmployeeDashboard() {
                                     onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1, 1))}
                                     className="calendar-nav-btn"
                                 >
-                                    <IconChevronLeft />
+                                    ←
                                 </button>
                                 <button
                                     onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() + 1, 1))}
                                     className="calendar-nav-btn"
                                 >
-                                    <IconChevronRight />
+                                    →
                                 </button>
                             </div>
                         </div>
@@ -692,22 +518,6 @@ export default function EmployeeDashboard() {
                                 </div>
                             ))}
                             {renderCal()}
-                        </div>
-
-                        <div className="calendar-stats">
-                            <div className="stat-box primary">
-                                <p className="stat-number">
-                                    {requisitions.filter(r => {
-                                        const date = new Date(r.createdAt);
-                                        return date.getMonth() === calDate.getMonth() && date.getFullYear() === calDate.getFullYear();
-                                    }).length}
-                                </p>
-                                <p className="stat-label">This month</p>
-                            </div>
-                            <div className="stat-box success">
-                                <p className="stat-number">{stats.approvalRate}%</p>
-                                <p className="stat-label">Approval rate</p>
-                            </div>
                         </div>
                     </div>
 
@@ -739,7 +549,7 @@ export default function EmployeeDashboard() {
                         <div className="modal-header">
                             <h3 className="text-lg font-semibold">Request Details</h3>
                             <button onClick={() => setSelectedRequest(null)} className="modal-close">
-                                ✕
+                                ×
                             </button>
                         </div>
                         <div className="modal-body">
@@ -787,3 +597,19 @@ export default function EmployeeDashboard() {
         </div>
     );
 }
+
+// Helper function
+const daysAgoLabel = (date) => {
+    if (!date) return "N/A";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.floor((today - d) / 86400000);
+
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    if (diff < 7) return `${diff} days ago`;
+    if (diff < 30) return `${Math.floor(diff / 7)} weeks ago`;
+    return `${Math.floor(diff / 30)} months ago`;
+};

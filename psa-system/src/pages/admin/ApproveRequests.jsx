@@ -107,7 +107,6 @@ const ApproveRequests = () => {
     }
   }, [API_BASE_URL]);
 
-  // FIXED: Use the correct endpoint for issuing
   const handleIssue = useCallback(async (requestId) => {
     if (!remarks.trim()) {
       alert("Please provide issuance remarks");
@@ -118,7 +117,6 @@ const ApproveRequests = () => {
       setProcessingId(requestId);
       const token = localStorage.getItem('token');
 
-      // FIXED: Use the correct endpoint - /api/requisitions/:id/issue
       const response = await fetch(`${API_BASE_URL}/api/requisitions/${requestId}/issue`, {
         method: "PUT",
         headers: {
@@ -182,14 +180,13 @@ const ApproveRequests = () => {
   const getStatusBadge = useCallback((status) => {
     const normalizedStatus = (status || '').toLowerCase();
     const badges = {
-      approved: { class: 'badge-approved', text: 'Approved', icon: '✓' },
-      rejected: { class: 'badge-rejected', text: 'Rejected', icon: '✗' },
-      issued: { class: 'badge-issued', text: 'Issued', icon: '📦' }
+      approved: { class: 'badge-approved', text: 'Approved' },
+      rejected: { class: 'badge-rejected', text: 'Rejected' },
+      issued: { class: 'badge-issued', text: 'Issued' }
     };
-    const config = badges[normalizedStatus] || { class: 'badge-default', text: status || 'Unknown', icon: '?' };
+    const config = badges[normalizedStatus] || { class: 'badge-default', text: status || 'Unknown' };
     return (
       <span className={`status-badge ${config.class}`}>
-        <span className="badge-icon">{config.icon}</span>
         {config.text}
       </span>
     );
@@ -241,14 +238,12 @@ const ApproveRequests = () => {
         {/* Alert Messages */}
         {error && (
           <div className="alert alert-error">
-            <span className="alert-icon">⚠️</span>
             <span className="alert-message">{error}</span>
           </div>
         )}
 
         {success && (
           <div className="alert alert-success">
-            <span className="alert-icon">✓</span>
             <span className="alert-message">{success}</span>
           </div>
         )}
@@ -256,21 +251,18 @@ const ApproveRequests = () => {
         {/* Stats Cards */}
         <div className="stats-grid">
           <div className="stat-card stat-approved">
-            <div className="stat-icon">✓</div>
             <div className="stat-info">
               <span className="stat-label">Approved</span>
               <span className="stat-value">{getAccurateStatusCount('approved')}</span>
             </div>
           </div>
           <div className="stat-card stat-issued">
-            <div className="stat-icon">📦</div>
             <div className="stat-info">
               <span className="stat-label">Issued</span>
               <span className="stat-value">{getAccurateStatusCount('issued')}</span>
             </div>
           </div>
           <div className="stat-card stat-rejected">
-            <div className="stat-icon">✗</div>
             <div className="stat-info">
               <span className="stat-label">Rejected</span>
               <span className="stat-value">{getAccurateStatusCount('rejected')}</span>
@@ -296,7 +288,6 @@ const ApproveRequests = () => {
           </div>
 
           <div className="search-wrapper">
-            <span className="search-icon">🔍</span>
             <input
               type="text"
               placeholder="Search by name, department, or employee ID..."
@@ -308,7 +299,7 @@ const ApproveRequests = () => {
               className="search-input"
             />
             {searchTerm && (
-              <button className="clear-search" onClick={() => setSearchTerm('')}>✕</button>
+              <button className="clear-search" onClick={() => setSearchTerm('')}>×</button>
             )}
           </div>
         </div>
@@ -316,7 +307,6 @@ const ApproveRequests = () => {
         {/* Request Cards Grid */}
         {filteredRequests.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📭</div>
             <h3 className="empty-title">No Requests Found</h3>
             <p className="empty-description">
               {searchTerm ? 'Try adjusting your search' : `No ${filter !== 'all' ? filter : ''} requests available`}
@@ -383,7 +373,7 @@ const ApproveRequests = () => {
                       {/* Notes */}
                       {request.notes && (
                         <div className="notes-section">
-                          <p className="notes-label">📝 Notes:</p>
+                          <p className="notes-label">Notes:</p>
                           <p className="notes-text">{request.notes}</p>
                         </div>
                       )}
