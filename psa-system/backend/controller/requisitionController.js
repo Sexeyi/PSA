@@ -30,7 +30,6 @@ exports.getAllRequisitions = async (req, res, next) => {
         let query = {};
 
         if (status && status !== "all") {
-            // Handle case-insensitive status matching
             const statusMap = {
                 'pending': 'Pending',
                 'approved': 'Approved',
@@ -105,6 +104,58 @@ exports.getMyRequisitions = async (req, res) => {
     }
 };
 
+// Helper function to find inventory item with fuzzy matching
+const findInventoryItem = async (itemName, itemId = null) => {
+    // If itemId is provided, try that first
+    if (itemId) {
+        const item = await Inventory.findById(itemId);
+        if (item) return item;
+    }
+
+    // Strategy 1: Exact match (case-insensitive)
+    let item = await Inventory.findOne({
+        name: { $regex: new RegExp('^' + escapeRegex(itemName) + '$', 'i') }
+    });
+    if (item) return item;
+
+    // Strategy 2: Remove common suffixes and try again
+    const cleanName = itemName.split(',')[0].split('(')[0].trim();
+    item = await Inventory.findOne({
+        name: { $regex: new RegExp(escapeRegex(cleanName), 'i') }
+    });
+    if (item) return item;
+
+    // Strategy 3: Search by keywords (longest meaningful words)
+    const keywords = itemName
+        .replace(/[()]/g, '')
+        .split(/[ ,]+/)
+        .filter(k => k.length > 3)
+        .sort((a, b) => b.length - a.length);
+
+    for (const keyword of keywords) {
+        item = await Inventory.findOne({
+            name: { $regex: new RegExp(escapeRegex(keyword), 'i') }
+        });
+        if (item) return item;
+    }
+
+    // Strategy 4: Partial match on any word
+    const words = itemName.split(/[ ,]+/).filter(w => w.length > 2);
+    for (const word of words) {
+        item = await Inventory.findOne({
+            name: { $regex: new RegExp(escapeRegex(word), 'i') }
+        });
+        if (item) return item;
+    }
+
+    return null;
+};
+
+// Helper function to escape regex special characters
+const escapeRegex = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
 // ------------------------- APPROVE REQUISITION -------------------------
 exports.approveRequisition = async (req, res) => {
     try {
@@ -117,7 +168,6 @@ exports.approveRequisition = async (req, res) => {
             });
         }
 
-        // Check if requisition is still pending
         if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
@@ -125,7 +175,6 @@ exports.approveRequisition = async (req, res) => {
             });
         }
 
-        // Check if user has permission (SuperAdmin or Admin)
         const userRole = req.user.role?.toLowerCase();
         if (userRole !== 'superadmin' && userRole !== 'admin') {
             return res.status(403).json({
@@ -134,56 +183,6 @@ exports.approveRequisition = async (req, res) => {
             });
         }
 
-        // Deduct inventory only if user is Admin (for issuance)
-        // For SuperAdmin, just approve without deducting inventory
-        if (userRole === 'admin') {
-            for (const item of requisition.items) {
-                // Try to find inventory item by name if itemId is not provided
-                let inventoryItem;
-
-                if (item.itemId) {
-                    inventoryItem = await Inventory.findById(item.itemId);
-                } else {
-                    // Try to find by item name (case-insensitive)
-                    inventoryItem = await Inventory.findOne({
-                        name: { $regex: new RegExp(item.itemName, 'i') }
-                    });
-                }
-
-                if (!inventoryItem) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Inventory item not found: ${item.itemName}`
-                    });
-                }
-
-                if (inventoryItem.stock < item.quantity) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.stock}, Requested: ${item.quantity}`
-                    });
-                }
-
-                // Deduct from inventory
-                inventoryItem.stock -= item.quantity;
-
-                // Add transaction record
-                if (!inventoryItem.transactions) {
-                    inventoryItem.transactions = [];
-                }
-
-                inventoryItem.transactions.push({
-                    type: "issuance",
-                    quantity: item.quantity,
-                    reference: requisition._id,
-                    date: new Date()
-                });
-
-                await inventoryItem.save();
-            }
-        }
-
-        // Update requisition status
         requisition.status = userRole === 'admin' ? "issued" : "approved";
         requisition.approvedDate = new Date();
         requisition.approverRemarks = req.body.remarks || "";
@@ -218,7 +217,6 @@ exports.issueRequisition = async (req, res) => {
             });
         }
 
-        // Check if user is Admin
         const userRole = req.user.role?.toLowerCase();
         if (userRole !== 'admin') {
             return res.status(403).json({
@@ -227,7 +225,6 @@ exports.issueRequisition = async (req, res) => {
             });
         }
 
-        // Check if requisition is approved by SuperAdmin
         if (requisition.status !== "approved") {
             return res.status(400).json({
                 success: false,
@@ -235,32 +232,30 @@ exports.issueRequisition = async (req, res) => {
             });
         }
 
-        // Deduct inventory for each item
-        for (const item of requisition.items) {
-            // Try to find inventory item by name if itemId is not provided
-            let inventoryItem;
+        const missingItems = [];
+        const issuedItems = [];
+        const stockIssues = [];
 
-            if (item.itemId) {
-                inventoryItem = await Inventory.findById(item.itemId);
-            } else {
-                // Try to find by item name (case-insensitive)
-                inventoryItem = await Inventory.findOne({
-                    name: { $regex: new RegExp(item.itemName, 'i') }
-                });
-            }
+        // Process each item
+        for (const item of requisition.items) {
+            const inventoryItem = await findInventoryItem(item.itemName, item.itemId);
 
             if (!inventoryItem) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Inventory item not found: ${item.itemName}`
+                missingItems.push({
+                    name: item.itemName,
+                    requestedQuantity: item.quantity,
+                    reason: "Not found in inventory"
                 });
+                continue;
             }
 
             if (inventoryItem.stock < item.quantity) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.stock}, Requested: ${item.quantity}`
+                stockIssues.push({
+                    name: inventoryItem.name,
+                    requested: item.quantity,
+                    available: inventoryItem.stock
                 });
+                continue;
             }
 
             // Deduct from inventory
@@ -275,24 +270,54 @@ exports.issueRequisition = async (req, res) => {
                 type: "issuance",
                 quantity: item.quantity,
                 reference: requisition._id,
-                date: new Date()
+                date: new Date(),
+                recipient: requisition.requesterName
             });
 
             await inventoryItem.save();
+
+            issuedItems.push({
+                name: inventoryItem.name,
+                quantity: item.quantity
+            });
+        }
+
+        // Handle stock issues
+        if (stockIssues.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Insufficient stock for some items",
+                stockIssues: stockIssues,
+                issuedItems: issuedItems,
+                missingItems: missingItems
+            });
         }
 
         // Update requisition status
         requisition.status = "issued";
         requisition.approvedDate = new Date();
+        requisition.issuedDate = new Date();
         requisition.approverRemarks = req.body.remarks || "";
         requisition.approvedBy = req.user.fullName;
 
         await requisition.save();
 
+        // Prepare response message
+        let message = "Requisition issued successfully";
+        let warning = false;
+
+        if (missingItems.length > 0) {
+            warning = true;
+            message = `Requisition issued but ${missingItems.length} item(s) were not found in inventory`;
+        }
+
         res.json({
             success: true,
-            message: "Requisition issued successfully",
-            data: requisition
+            warning: warning,
+            message: message,
+            data: requisition,
+            issuedItems: issuedItems,
+            missingItems: missingItems.length > 0 ? missingItems : undefined
         });
 
     } catch (error) {
@@ -316,7 +341,6 @@ exports.rejectRequisition = async (req, res) => {
             });
         }
 
-        // Check if requisition is still pending
         if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
@@ -324,7 +348,6 @@ exports.rejectRequisition = async (req, res) => {
             });
         }
 
-        // Check if user has permission (SuperAdmin or Admin)
         const userRole = req.user.role?.toLowerCase();
         if (userRole !== 'superadmin' && userRole !== 'admin') {
             return res.status(403).json({
@@ -367,7 +390,6 @@ exports.updateRequisition = async (req, res) => {
             });
         }
 
-        // Only allow updates if status is pending
         if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
@@ -375,9 +397,7 @@ exports.updateRequisition = async (req, res) => {
             });
         }
 
-        // Update fields
         const { items, notes } = req.body;
-
         if (items) requisition.items = items;
         if (notes !== undefined) requisition.notes = notes;
 
@@ -410,7 +430,6 @@ exports.deleteRequisition = async (req, res) => {
             });
         }
 
-        // Only allow deletion if status is pending
         if (requisition.status !== "pending") {
             return res.status(400).json({
                 success: false,
@@ -460,12 +479,11 @@ exports.generatePDF = async (req, res) => {
         const margin = 50;
         const pageWidth = doc.page.width - 100;
 
-        // ==================== HEADER ====================
+        // Header
         doc.fontSize(10).font("Helvetica")
             .text("Appendix 63", margin, y);
         y += 20;
 
-        // Title
         doc.fontSize(14).font("Helvetica-Bold")
             .text("REQUISITION AND ISSUE SLIP", margin, y, {
                 align: "center",
@@ -473,7 +491,6 @@ exports.generatePDF = async (req, res) => {
             });
         y += 25;
 
-        // Entity Name and Fund Cluster
         doc.fontSize(9).font("Helvetica");
         doc.text("Entity Name :", margin, y);
         doc.font("Helvetica-Bold")
@@ -487,15 +504,13 @@ exports.generatePDF = async (req, res) => {
 
         y += 20;
 
-        // ==================== MAIN TABLE ====================
-        // Column widths for the entire table
-        const col1Width = 150; // Division/Office column (first column)
-        const col2Width = 150; // Responsibility Center Code/RIS No. column (second column)
-        const col3Width = 160; // Requisition section (starts from the beginning of row 2)
-        const col4Width = 70;  // Stock Available? section
-        const col5Width = 110; // Issue section
+        // Table setup
+        const col1Width = 150;
+        const col2Width = 150;
+        const col3Width = 160;
+        const col4Width = 70;
+        const col5Width = 110;
 
-        // Sub-column widths for the data section
         const stockNoWidth = 45;
         const unitWidth = 40;
         const descWidth = 75;
@@ -506,23 +521,15 @@ exports.generatePDF = async (req, res) => {
         const remarksWidth = 65;
 
         let x = margin;
-
-        // ==================== ROW 1: Division | Responsibility Center Code ====================
-        doc.lineWidth(0.5);
-
-        // Row 1 height (for two lines of text)
         const row1Height = 40;
 
-        // Draw ONLY the two cells for row 1
         doc.rect(x, y, col1Width, row1Height).stroke();
         doc.rect(x + col1Width, y, col2Width, row1Height).stroke();
 
-        // First line of row 1
         doc.font("Helvetica-Bold").fontSize(8);
         doc.text("Division :", x + 5, y + 5);
         doc.text("Responsibility Center Code :", x + col1Width + 5, y + 5);
 
-        // Second line of row 1 (move down 20px)
         y += 20;
 
         doc.font("Helvetica-Bold").fontSize(8);
@@ -536,19 +543,13 @@ exports.generatePDF = async (req, res) => {
         doc.font("Helvetica-Bold").fontSize(8)
             .text(requisition._id.toString().slice(-8).toUpperCase(), x + col1Width + 45, y);
 
-        // Move y to bottom of row 1
         y += 20;
-
-        // ==================== ROW 2: Requisition | Stock Available? | Issue ====================
-        // Reset x to the very beginning (margin) for row 2
         x = margin;
 
-        // Draw the three cells for row 2 - starting from the very left
         doc.rect(x, y, col3Width, 25).stroke();
         doc.rect(x + col3Width, y, col4Width, 25).stroke();
         doc.rect(x + col3Width + col4Width, y, col5Width, 25).stroke();
 
-        // Row 2 text
         doc.font("Helvetica-Bold").fontSize(9);
         doc.text("REQUISITION", x + 40, y + 7);
 
@@ -560,11 +561,8 @@ exports.generatePDF = async (req, res) => {
         doc.text("ISSUE", x + col3Width + col4Width + 35, y + 7);
 
         y += 25;
+        x = margin;
 
-        // ==================== ROW 3: Column Headers ====================
-        x = margin; // Start from the very beginning again
-
-        // Draw all column headers
         doc.rect(x, y, stockNoWidth, 20).stroke();
         doc.rect(x + stockNoWidth, y, unitWidth, 20).stroke();
         doc.rect(x + stockNoWidth + unitWidth, y, descWidth, 20).stroke();
@@ -574,25 +572,19 @@ exports.generatePDF = async (req, res) => {
         doc.rect(x + stockNoWidth + unitWidth + descWidth + qtyWidth + stockYesWidth + stockNoCheckWidth, y, issueQtyWidth, 20).stroke();
         doc.rect(x + stockNoWidth + unitWidth + descWidth + qtyWidth + stockYesWidth + stockNoCheckWidth + issueQtyWidth, y, remarksWidth, 20).stroke();
 
-        // Header text
         doc.font("Helvetica-Bold").fontSize(8);
         doc.text("Stock No.", x + 8, y + 5);
         doc.text("Unit", x + stockNoWidth + 10, y + 5);
         doc.text("Description", x + stockNoWidth + unitWidth + 8, y + 5);
         doc.text("Quantity", x + stockNoWidth + unitWidth + descWidth + 8, y + 5);
-        // No text for the checkbox columns
         doc.text("Quantity", x + stockNoWidth + unitWidth + descWidth + qtyWidth + stockYesWidth + stockNoCheckWidth + 8, y + 5);
         doc.text("Remarks", x + stockNoWidth + unitWidth + descWidth + qtyWidth + stockYesWidth + stockNoCheckWidth + issueQtyWidth + 10, y + 5);
 
         y += 20;
 
-        // ==================== DATA ROWS (10 rows) ====================
         const rowHeight = 18;
-
-        // Prepare rows data from requisition items
         const rows = [];
 
-        // Add requisition items (up to 10)
         if (requisition.items && requisition.items.length > 0) {
             requisition.items.forEach((item, index) => {
                 if (index < 10) {
@@ -607,7 +599,6 @@ exports.generatePDF = async (req, res) => {
             });
         }
 
-        // Fill remaining rows with empty data
         for (let i = rows.length; i < 10; i++) {
             rows.push({
                 stockNo: i + 1,
@@ -618,50 +609,40 @@ exports.generatePDF = async (req, res) => {
             });
         }
 
-        // Draw each row
         rows.forEach((row, index) => {
-            x = margin; // Start from the very beginning for each row
+            x = margin;
 
-            // Stock No.
             doc.rect(x, y, stockNoWidth, rowHeight).stroke();
             doc.font("Helvetica").fontSize(8)
                 .text(String(row.stockNo), x + 15, y + 5);
             x += stockNoWidth;
 
-            // Unit
             doc.rect(x, y, unitWidth, rowHeight).stroke();
             doc.text(row.unit, x + 12, y + 5);
             x += unitWidth;
 
-            // Description
             doc.rect(x, y, descWidth, rowHeight).stroke();
             doc.text(row.description, x + 8, y + 5, { width: descWidth - 10 });
             x += descWidth;
 
-            // Quantity
             doc.rect(x, y, qtyWidth, rowHeight).stroke();
             doc.text(String(row.quantity), x + 12, y + 5);
             x += qtyWidth;
 
-            // Stock Available? Yes checkbox
             doc.rect(x, y, stockYesWidth, rowHeight).stroke();
             doc.rect(x + 10, y + 4, 10, 10).stroke();
             if (row.quantity) {
-                // Check if stock is available (you can add logic here)
                 doc.text("✓", x + 12, y + 2);
             }
             x += stockYesWidth;
 
-            // Stock Available? No checkbox
             doc.rect(x, y, stockNoCheckWidth, rowHeight).stroke();
             doc.rect(x + 10, y + 4, 10, 10).stroke();
             x += stockNoCheckWidth;
 
-            // Issue Quantity (empty)
             doc.rect(x, y, issueQtyWidth, rowHeight).stroke();
             x += issueQtyWidth;
 
-            // Remarks
             doc.rect(x, y, remarksWidth, rowHeight).stroke();
             doc.text(row.remarks, x + 8, y + 5, { width: remarksWidth - 10 });
 
@@ -669,13 +650,9 @@ exports.generatePDF = async (req, res) => {
         });
 
         y += 10;
-
-        // ==================== SIGNATURE TABLE ====================
         const sigWidth = 140;
-
         x = margin;
 
-        // Signature header row
         doc.rect(x, y, sigWidth, 20).stroke();
         doc.font("Helvetica-Bold").fontSize(8).text("Signature :", x + 5, y + 5);
 
@@ -696,9 +673,8 @@ exports.generatePDF = async (req, res) => {
         doc.text("Received by:", x + 5, y + 5);
 
         y += 20;
-
-        // Printed Name row
         x = margin;
+
         doc.rect(x, y, sigWidth, 20).stroke();
         doc.font("Helvetica").text("Printed Name :", x + 5, y + 5);
 
@@ -712,16 +688,15 @@ exports.generatePDF = async (req, res) => {
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
-        doc.text("_____________________", x + 5, y + 5);
+        doc.text(req.user?.fullName || "_____________________", x + 5, y + 5);
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
         doc.text("_____________________", x + 5, y + 5);
 
         y += 20;
-
-        // Designation row
         x = margin;
+
         doc.rect(x, y, sigWidth, 20).stroke();
         doc.text("Designation :", x + 5, y + 5);
 
@@ -735,44 +710,48 @@ exports.generatePDF = async (req, res) => {
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
-        doc.text("_____________________", x + 5, y + 5);
+        doc.text("Administrator", x + 5, y + 5);
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
         doc.text("_____________________", x + 5, y + 5);
 
         y += 20;
-
-        // Date row
         x = margin;
+
         doc.rect(x, y, sigWidth, 20).stroke();
         doc.text("Date :", x + 5, y + 5);
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
-
-        // Format date
         const dateStr = requisition.dateRequested
             ? new Date(requisition.dateRequested).toLocaleDateString('en-US', {
                 month: '2-digit',
                 day: '2-digit',
                 year: 'numeric'
-            }).replace(/\//g, '/')
+            })
             : new Date().toLocaleDateString('en-US', {
                 month: '2-digit',
                 day: '2-digit',
                 year: 'numeric'
-            }).replace(/\//g, '/');
-
+            });
         doc.text(dateStr, x + 5, y + 5);
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
-        doc.text("_____________________", x + 5, y + 5);
+        doc.text(new Date().toLocaleDateString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: 'numeric'
+        }), x + 5, y + 5);
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
-        doc.text("_____________________", x + 5, y + 5);
+        doc.text(new Date().toLocaleDateString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: 'numeric'
+        }), x + 5, y + 5);
 
         x += sigWidth;
         doc.rect(x, y, sigWidth, 20).stroke();
@@ -799,7 +778,6 @@ exports.updateRequisitionStatus = async (req, res) => {
             });
         }
 
-        // Validate status
         const validStatuses = ['Pending', 'Approved', 'Rejected', 'Issued'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({

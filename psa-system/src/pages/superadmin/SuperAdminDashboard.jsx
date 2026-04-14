@@ -14,9 +14,7 @@ const SuperAdminDashboard = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   // Data states
-  const [inventory, setInventory] = useState([]);
   const [requisitions, setRequisitions] = useState([]);
-  const [users, setUsers] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
 
   // Stats
@@ -74,7 +72,6 @@ const SuperAdminDashboard = () => {
       if (results[0].status === 'fulfilled' && results[0].value.ok) {
         const inventoryData = await results[0].value.json();
         const inventoryArray = Array.isArray(inventoryData) ? inventoryData : inventoryData.data || [];
-        setInventory(inventoryArray);
         processInventoryData(inventoryArray);
       }
 
@@ -90,7 +87,6 @@ const SuperAdminDashboard = () => {
       if (results[2].status === 'fulfilled' && results[2].value.ok) {
         const usersData = await results[2].value.json();
         const usersArray = Array.isArray(usersData) ? usersData : usersData.data || [];
-        setUsers(usersArray);
         setStats(prev => ({ ...prev, activeUsers: usersArray.length }));
       }
 
@@ -301,7 +297,6 @@ const SuperAdminDashboard = () => {
       <div className="dashboard">
         <div className="flex-center" style={{ minHeight: '100vh' }}>
           <div className="text-center">
-            <div className="text-danger" style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
             <h2 className="text-xl mb-2">Error Loading Dashboard</h2>
             <p className="text-secondary mb-4">{error}</p>
             <button
@@ -339,9 +334,6 @@ const SuperAdminDashboard = () => {
       {/* KPI Cards */}
       <div className="dashboard-cards">
         <div className="card">
-          <div className="card-icon">
-            <span>📦</span>
-          </div>
           <div className="card-content">
             <h3>Total Supplies</h3>
             <div className="card-value">{stats.totalSupplies}</div>
@@ -350,9 +342,6 @@ const SuperAdminDashboard = () => {
         </div>
 
         <div className="card">
-          <div className="card-icon" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
-            <span>💰</span>
-          </div>
           <div className="card-content">
             <h3>Total Value</h3>
             <div className="card-value" style={{ color: '#22c55e' }}>{formatCurrency(stats.totalValue)}</div>
@@ -361,9 +350,6 @@ const SuperAdminDashboard = () => {
         </div>
 
         <div className="card">
-          <div className="card-icon" style={{ background: 'rgba(168, 85, 247, 0.1)' }}>
-            <span>👥</span>
-          </div>
           <div className="card-content">
             <h3>Active Users</h3>
             <div className="card-value" style={{ color: '#a855f7' }}>{stats.activeUsers}</div>
@@ -372,9 +358,6 @@ const SuperAdminDashboard = () => {
         </div>
 
         <div className="card">
-          <div className="card-icon" style={{ background: 'rgba(234, 179, 8, 0.1)' }}>
-            <span>📋</span>
-          </div>
           <div className="card-content">
             <h3>Pending Requests</h3>
             <div className="card-value" style={{ color: '#eab308' }}>{stats.pendingRequests}</div>
@@ -450,13 +433,6 @@ const SuperAdminDashboard = () => {
             {recentActivities.map(activity => (
               <div key={activity.id} className="flex-between border-bottom pb-4">
                 <div className="flex-center gap-3">
-                  <div className={`card-icon`} style={{ width: '32px', height: '32px', background: activity.type === 'request' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(34, 197, 94, 0.1)' }}>
-                    <span style={{ fontSize: '1rem' }}>
-                      {activity.type === 'request' && '📝'}
-                      {activity.type === 'approve' && '✅'}
-                      {activity.type === 'update' && '🔄'}
-                    </span>
-                  </div>
                   <div>
                     <p className="font-medium">{activity.user} {activity.action} {activity.item}</p>
                     <p className="text-secondary text-sm mt-1">{activity.time}</p>

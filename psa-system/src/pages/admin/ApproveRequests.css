@@ -871,3 +871,363 @@
     width: 100%;
   }
 }
+
+/* Excel Export Button Styles */
+.btn-excel,
+.btn-excel-small,
+.btn-excel-modal {
+  background: #10b981;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.btn-excel {
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.btn-excel:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-excel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-excel-small {
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  background: #10b981;
+}
+
+.btn-excel-small:hover {
+  background: #059669;
+}
+
+.btn-excel-modal {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+}
+
+.btn-excel-modal:hover {
+  background: #059669;
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Add to ApproveRequests.css */
+
+/* Excel Export Button Styles */
+.btn-excel,
+.btn-excel-small,
+.btn-excel-modal {
+  background: #10b981;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.btn-excel {
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.btn-excel:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-excel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-excel-small {
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  background: #10b981;
+}
+
+.btn-excel-small:hover {
+  background: #059669;
+}
+
+.btn-excel-modal {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+}
+
+.btn-excel-modal:hover {
+  background: #059669;
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Add to ApproveRequests.css */
+
+/* Enhanced Modal Styles */
+.modal-container {
+  background: white;
+  border-radius: var(--radius-xl);
+  max-width: 1000px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+  box-shadow: var(--shadow-xl);
+}
+
+.modal-large {
+  max-width: 1200px;
+}
+
+/* Requisition ID */
+.requisition-id {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Items Summary Stats */
+.items-summary-stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: var(--gray-50);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.summary-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.summary-stat .stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-stat .stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Priority Badge */
+.priority-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.priority-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.priority-medium {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.priority-low {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Enhanced Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.info-item {
+  padding: 0.5rem;
+  background: var(--gray-50);
+  border-radius: var(--radius-md);
+}
+
+.info-item label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.info-item p {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Notes Section */
+.notes-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #fffbeb;
+  border-left: 4px solid var(--warning);
+  border-radius: var(--radius-md);
+}
+
+.notes-content {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Details Table Enhanced */
+.details-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.details-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+  background: var(--gray-50);
+}
+
+.details-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.details-table tbody tr:hover {
+  background: var(--gray-50);
+}
+
+.item-name-cell {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.total-cell {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.total-row {
+  background: var(--gray-50);
+  font-weight: 700;
+}
+
+.total-row td {
+  border-top: 2px solid var(--border);
+  font-weight: 700;
+}
+
+.total-value {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 0.875rem;
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* Modal Footer Buttons */
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: var(--gray-50);
+}
+
+.btn-issue-modal,
+.btn-excel-modal {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-issue-modal {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-issue-modal:hover {
+  background: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.btn-excel-modal {
+  background: #10b981;
+  color: white;
+}
+
+.btn-excel-modal:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--gray-50);
+}

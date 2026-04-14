@@ -283,7 +283,7 @@ const InventoryTable = () => {
           const item = {
             name: name,
             unit: unit,
-            category: "General",
+            category: "Office Supplies",
             inventoryDec31: {
               qty: parseFloat(row[2]) || 0,
               unitPrice: parseFloat(row[3]) || 0,
@@ -435,7 +435,7 @@ const InventoryTable = () => {
               disabled={uploadLoading}
               className="btn-upload"
             >
-              📤 {uploadLoading ? 'Uploading...' : 'Upload Excel'}
+              {uploadLoading ? 'Uploading...' : 'Upload Excel'}
             </button>
             <input
               type="file"
@@ -445,10 +445,10 @@ const InventoryTable = () => {
               className="hidden-input"
             />
             <button onClick={downloadTemplate} className="btn-template">
-              📥 Template
+              Template
             </button>
             <button onClick={() => setShowAddModal(true)} className="btn-primary">
-              + Add New Supply
+              Add New Supply
             </button>
           </div>
         </div>
@@ -461,10 +461,10 @@ const InventoryTable = () => {
             </div>
             <div className="selection-actions">
               <button onClick={() => setShowBulkEditModal(true)} className="btn-bulk-edit">
-                ✏️ Bulk Edit
+                Bulk Edit
               </button>
               <button onClick={handleDeleteSelected} className="btn-bulk-delete">
-                🗑️ Delete Selected
+                Delete Selected
               </button>
             </div>
           </div>
@@ -595,7 +595,7 @@ const InventoryTable = () => {
         {/* Error Message */}
         {error && (
           <div className="alert-error">
-            <span className="alert-icon">⚠️</span>
+            <span className="alert-icon"></span>
             <span>{error}</span>
           </div>
         )}
@@ -613,7 +613,6 @@ const InventoryTable = () => {
               }}
               className="search-input"
             />
-            <span className="search-icon">🔍</span>
           </div>
           <div className="stats-badge">
             <span>Total Items:</span>
@@ -650,7 +649,6 @@ const InventoryTable = () => {
                   <tr>
                     <td colSpan="9" className="empty-state">
                       <div className="empty-content">
-                        <span className="empty-icon">📦</span>
                         <p>{searchTerm ? "No items match your search" : "No inventory items found"}</p>
                       </div>
                     </td>
@@ -726,28 +724,28 @@ const InventoryTable = () => {
         {/* Summary Cards */}
         <div className="summary-grid">
           <div className="summary-card">
-            <div className="summary-icon">📦</div>
+            <div className="summary-icon"></div>
             <div>
               <p className="summary-label">Total Items</p>
               <p className="summary-value">{inventory.length}</p>
             </div>
           </div>
           <div className="summary-card">
-            <div className="summary-icon">💰</div>
+            <div className="summary-icon"></div>
             <div>
               <p className="summary-label">Total Value</p>
               <p className="summary-value">{formatCurrency(calculateTotalValue())}</p>
             </div>
           </div>
           <div className="summary-card summary-warning">
-            <div className="summary-icon">⚠️</div>
+            <div className="summary-icon"></div>
             <div>
               <p className="summary-label">Low Stock Items</p>
               <p className="summary-value">{calculateLowStockCount()}</p>
             </div>
           </div>
           <div className="summary-card summary-danger">
-            <div className="summary-icon">❌</div>
+            <div className="summary-icon"></div>
             <div>
               <p className="summary-label">Out of Stock</p>
               <p className="summary-value">{calculateOutOfStockCount()}</p>
