@@ -8,6 +8,7 @@ const InventoryTable = () => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -17,6 +18,7 @@ const InventoryTable = () => {
   const [itemsPerPage] = useState(10);
   const [uploadData, setUploadData] = useState([]);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState([]);
 
   const [selectedItems, setSelectedItems] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -78,6 +80,14 @@ const InventoryTable = () => {
     fetchInventory();
   }, []);
 
+  // Clear success message after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -103,6 +113,7 @@ const InventoryTable = () => {
 
   const handleSupplyAdded = (newSupply) => {
     fetchInventory();
+    setSuccess("New supply added successfully!");
   };
 
   const handleSelectItem = (itemId) => {
@@ -134,6 +145,37 @@ const InventoryTable = () => {
     setShowEditModal(true);
   };
 
+  const handleDeleteItem = async (itemId, itemName) => {
+    if (!window.confirm(`Are you sure you want to delete "${itemName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setUploadLoading(true);
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${API_BASE_URL}/api/inventories/${itemId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete item");
+      }
+
+      await fetchInventory();
+      setSuccess(`"${itemName}" deleted successfully!`);
+
+    } catch (error) {
+      console.error("Delete error:", error);
+      setError("Failed to delete item. Please try again.");
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   const handleSaveEdit = async (updatedItem) => {
     try {
       const token = localStorage.getItem("token");
@@ -154,6 +196,7 @@ const InventoryTable = () => {
       await fetchInventory();
       setShowEditModal(false);
       setCurrentEditItem(null);
+      setSuccess("Item updated successfully!");
 
     } catch (error) {
       console.error("Edit error:", error);
@@ -204,6 +247,7 @@ const InventoryTable = () => {
       setSelectedItems([]);
       setBulkEditField("");
       setBulkEditValue("");
+      setSuccess(`${selectedItems.length} item(s) updated successfully!`);
 
     } catch (error) {
       console.error("Bulk edit error:", error);
@@ -216,7 +260,7 @@ const InventoryTable = () => {
   const handleDeleteSelected = async () => {
     if (selectedItems.length === 0) return;
 
-    if (!window.confirm(`Are you sure you want to delete ${selectedItems.length} selected items?`)) {
+    if (!window.confirm(`Are you sure you want to delete ${selectedItems.length} selected items? This action cannot be undone.`)) {
       return;
     }
 
@@ -233,9 +277,16 @@ const InventoryTable = () => {
         })
       );
 
-      await Promise.all(deletePromises);
-      await fetchInventory();
-      setSelectedItems([]);
+      const results = await Promise.all(deletePromises);
+      const failedDeletes = results.filter(res => !res.ok);
+
+      if (failedDeletes.length > 0) {
+        setError(`Failed to delete ${failedDeletes.length} items. Please try again.`);
+      } else {
+        await fetchInventory();
+        setSelectedItems([]);
+        setSuccess(`${selectedItems.length} item(s) deleted successfully!`);
+      }
 
     } catch (error) {
       console.error("Delete error:", error);
@@ -245,6 +296,7 @@ const InventoryTable = () => {
     }
   };
 
+  // Enhanced Excel file upload handler for grouped columns
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -260,81 +312,187 @@ const InventoryTable = () => {
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
+
+        // Get all rows as array
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-        const dataRows = rows.slice(2);
+
+        if (!rows || rows.length === 0) {
+          setError("Excel file is empty");
+          setUploadLoading(false);
+          return;
+        }
+
+        // Find the header row and data start row
+        let headerRowIndex = -1;
+        let dataStartRow = -1;
+
+        // Look for header indicators (usually contains "name", "unit", etc.)
+        for (let i = 0; i < Math.min(10, rows.length); i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+
+          const firstCell = (row[0] || "").toString().toLowerCase();
+          const secondCell = (row[1] || "").toString().toLowerCase();
+
+          // Check if this looks like a header row
+          if (firstCell === "name" || firstCell === "item name" || firstCell === "item" ||
+            (firstCell === "a" && secondCell === "b") ||
+            (firstCell === "product" && secondCell === "unit")) {
+            headerRowIndex = i;
+            dataStartRow = i + 1;
+            break;
+          }
+        }
+
+        // If no header found, assume first row is header and data starts from row 1
+        if (headerRowIndex === -1) {
+          headerRowIndex = 0;
+          dataStartRow = 1;
+        }
+
         const parsedData = [];
+        const previewData = [];
 
-        dataRows.forEach((row) => {
-          const name = row[0];
-          const unit = row[1];
+        // Parse each data row
+        for (let i = dataStartRow; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length < 2) continue;
 
-          if (!name || !unit) return;
+          let name = row[0];
+          let unit = row[1];
 
-          const lowerName = name.toString().toLowerCase();
+          // Handle if name/unit are in different positions
+          if (!name && row[1]) {
+            name = row[1];
+            unit = row[2];
+          }
 
-          if (
-            lowerName.includes("consumables") ||
+          if (!name || !unit) continue;
+
+          // Clean up the values
+          name = name.toString().trim();
+          unit = unit.toString().trim();
+
+          // Skip summary or total rows
+          const lowerName = name.toLowerCase();
+          if (lowerName.includes("consumables") ||
             lowerName.includes("covid") ||
-            lowerName.includes("total")
-          ) {
-            return;
+            lowerName.includes("total") ||
+            lowerName.includes("summary") ||
+            lowerName.includes("subtotal")) {
+            continue;
+          }
+
+          // Parse the grouped columns (assuming groups of 3: Qty, Price, Total)
+          // Adjust indices based on your actual structure
+          const inventoryQty = parseFloat(row[2]) || 0;
+          const inventoryPrice = parseFloat(row[3]) || 0;
+          const inventoryTotal = parseFloat(row[4]) || (inventoryQty * inventoryPrice);
+
+          const additionsQty = parseFloat(row[5]) || 0;
+          const additionsPrice = parseFloat(row[6]) || 0;
+          const additionsTotal = parseFloat(row[7]) || (additionsQty * additionsPrice);
+
+          const issuancesQty = parseFloat(row[8]) || 0;
+          const issuancesPrice = parseFloat(row[9]) || 0;
+          const issuancesTotal = parseFloat(row[10]) || (issuancesQty * issuancesPrice);
+
+          const balancesQty = parseFloat(row[11]) || 0;
+          const balancesPrice = parseFloat(row[12]) || 0;
+          const balancesTotal = parseFloat(row[13]) || (balancesQty * balancesPrice);
+
+          // Determine final stock and unit price
+          let stock = balancesQty;
+          let unitPrice = balancesPrice;
+
+          // If balances are empty, use inventory values
+          if (stock === 0 && inventoryQty > 0) {
+            stock = inventoryQty;
+            unitPrice = inventoryPrice;
+          }
+
+          // If still no price but we have total and qty, calculate
+          if (unitPrice === 0 && stock > 0 && balancesTotal > 0) {
+            unitPrice = balancesTotal / stock;
           }
 
           const item = {
             name: name,
             unit: unit,
-            category: "Office Supplies",
+            category: "Office Supplies", // Default category, can be customized
+            stock: stock,
+            unitPrice: unitPrice,
+            // Store additional data for reference
             inventoryDec31: {
-              qty: parseFloat(row[2]) || 0,
-              unitPrice: parseFloat(row[3]) || 0,
-              total: parseFloat(row[4]) || 0
+              qty: inventoryQty,
+              unitPrice: inventoryPrice,
+              total: inventoryTotal
             },
             additions: {
-              qty: parseFloat(row[5]) || 0,
-              unitPrice: parseFloat(row[6]) || 0,
-              total: parseFloat(row[7]) || 0
+              qty: additionsQty,
+              unitPrice: additionsPrice,
+              total: additionsTotal
             },
             issuances: {
-              qty: parseFloat(row[8]) || 0,
-              unitPrice: parseFloat(row[9]) || 0,
-              total: parseFloat(row[10]) || 0
+              qty: issuancesQty,
+              unitPrice: issuancesPrice,
+              total: issuancesTotal
             },
             balances: {
-              qty: parseFloat(row[11]) || 0,
-              unitPrice: parseFloat(row[12]) || 0,
-              total: parseFloat(row[13]) || 0
+              qty: balancesQty,
+              unitPrice: balancesPrice,
+              total: balancesTotal
             }
           };
 
-          const balanceQty = item.balances.qty;
-          const balanceTotal = item.balances.total;
-
-          item.stock = balanceQty;
-          item.unitPrice = balanceQty > 0 ? balanceTotal / balanceQty : 0;
-
           parsedData.push(item);
-        });
+
+          // Add to preview (first 5 items)
+          if (previewData.length < 5) {
+            previewData.push({
+              name: item.name,
+              category: item.category,
+              unit: item.unit,
+              stock: item.stock,
+              unitPrice: item.unitPrice
+            });
+          }
+        }
 
         if (parsedData.length === 0) {
-          setError("No valid inventory items found in the file.");
+          setError("No valid inventory items found in the file. Please check the format.");
+          setUploadLoading(false);
           return;
         }
 
         setUploadData(parsedData);
+        setUploadPreview(previewData);
         setShowUploadModal(true);
 
       } catch (error) {
         console.error("Excel parse error:", error);
-        setError("Failed to parse Excel file.");
+        setError("Failed to parse Excel file. Error: " + error.message);
       } finally {
         setUploadLoading(false);
+        // Clear the file input
+        e.target.value = '';
       }
+    };
+
+    reader.onerror = () => {
+      setError("Failed to read file");
+      setUploadLoading(false);
     };
 
     reader.readAsArrayBuffer(file);
   };
 
   const handleUploadConfirm = async () => {
+    if (!uploadData || uploadData.length === 0) {
+      setError("No data to upload");
+      return;
+    }
+
     try {
       setUploadLoading(true);
       const token = localStorage.getItem("token");
@@ -344,28 +502,58 @@ const InventoryTable = () => {
         return;
       }
 
-      const batchSize = 10;
-      const results = [];
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
 
+      // Process items in batches to avoid overwhelming the server
+      const batchSize = 10;
       for (let i = 0; i < uploadData.length; i += batchSize) {
         const batch = uploadData.slice(i, i + batchSize);
-        const promises = batch.map(item =>
-          fetch(`${API_BASE_URL}/api/inventories`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify(item)
-          }).then(res => res.json())
-        );
-        const batchResults = await Promise.all(promises);
-        results.push(...batchResults);
+        const promises = batch.map(async (item) => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/api/inventories`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify(item)
+            });
+
+            if (response.ok) {
+              successCount++;
+              return { success: true };
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              failCount++;
+              errors.push(`${item.name}: ${errorData.message || 'Failed to upload'}`);
+              return { success: false, error: errorData };
+            }
+          } catch (error) {
+            failCount++;
+            errors.push(`${item.name}: ${error.message}`);
+            return { success: false, error: error.message };
+          }
+        });
+
+        await Promise.all(promises);
       }
 
       await fetchInventory();
       setShowUploadModal(false);
       setUploadData([]);
+      setUploadPreview([]);
+
+      if (successCount > 0) {
+        setSuccess(`Successfully uploaded ${successCount} item(s). ${failCount > 0 ? `Failed: ${failCount}` : ''}`);
+      }
+      if (failCount > 0 && errors.length > 0) {
+        console.error("Upload errors:", errors);
+        if (successCount === 0) {
+          setError(`Failed to upload items. ${errors[0]}`);
+        }
+      }
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -376,20 +564,64 @@ const InventoryTable = () => {
   };
 
   const downloadTemplate = () => {
-    const template = [
+    const templateData = [
       {
-        'Name': 'Example Item',
-        'Unit': 'pcs',
-        'Category': 'Office Supplies',
-        'Stock': 100,
-        'Unit Price': 50.00
+        'Name': 'Bond Paper',
+        'Unit': 'ream',
+        'Inventory Qty': 100,
+        'Inventory Unit Price': 250.00,
+        'Inventory Total': 25000.00,
+        'Additions Qty': 50,
+        'Additions Unit Price': 260.00,
+        'Additions Total': 13000.00,
+        'Issuances Qty': 30,
+        'Issuances Unit Price': 250.00,
+        'Issuances Total': 7500.00,
+        'Balances Qty': 120,
+        'Balances Unit Price': 254.17,
+        'Balances Total': 30500.00
+      },
+      {
+        'Name': 'Ballpen',
+        'Unit': 'box',
+        'Inventory Qty': 50,
+        'Inventory Unit Price': 120.00,
+        'Inventory Total': 6000.00,
+        'Additions Qty': 20,
+        'Additions Unit Price': 125.00,
+        'Additions Total': 2500.00,
+        'Issuances Qty': 15,
+        'Issuances Unit Price': 120.00,
+        'Issuances Total': 1800.00,
+        'Balances Qty': 55,
+        'Balances Unit Price': 121.82,
+        'Balances Total': 6700.00
       }
     ];
 
-    const ws = XLSX.utils.json_to_sheet(template);
+    const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, 'inventory_template.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory Template');
+
+    // Adjust column widths
+    ws['!cols'] = [
+      { wch: 20 }, // Name
+      { wch: 10 }, // Unit
+      { wch: 15 }, // Inventory Qty
+      { wch: 18 }, // Inventory Unit Price
+      { wch: 15 }, // Inventory Total
+      { wch: 15 }, // Additions Qty
+      { wch: 18 }, // Additions Unit Price
+      { wch: 15 }, // Additions Total
+      { wch: 15 }, // Issuances Qty
+      { wch: 18 }, // Issuances Unit Price
+      { wch: 15 }, // Issuances Total
+      { wch: 15 }, // Balances Qty
+      { wch: 18 }, // Balances Unit Price
+      { wch: 15 }  // Balances Total
+    ];
+
+    XLSX.writeFile(wb, 'inventory_import_template.xlsx');
   };
 
   const getStockStatus = (stock) => {
@@ -435,7 +667,7 @@ const InventoryTable = () => {
               disabled={uploadLoading}
               className="btn-upload"
             >
-              {uploadLoading ? 'Uploading...' : 'Upload Excel'}
+              {uploadLoading ? 'Processing...' : 'Upload Excel'}
             </button>
             <input
               type="file"
@@ -445,7 +677,7 @@ const InventoryTable = () => {
               className="hidden-input"
             />
             <button onClick={downloadTemplate} className="btn-template">
-              Template
+              Download Template
             </button>
             <button onClick={() => setShowAddModal(true)} className="btn-primary">
               Add New Supply
@@ -552,7 +784,7 @@ const InventoryTable = () => {
               </div>
               <div className="modal-body">
                 <p className="modal-description">
-                  Found <strong>{uploadData.length}</strong> items to upload.
+                  Found <strong>{uploadData.length}</strong> items ready to upload.
                 </p>
                 <div className="preview-table-wrapper">
                   <table className="preview-table">
@@ -566,13 +798,13 @@ const InventoryTable = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {uploadData.slice(0, 5).map((item, index) => (
+                      {uploadPreview.map((item, index) => (
                         <tr key={index}>
                           <td>{item.name}</td>
                           <td>{item.category}</td>
                           <td>{item.unit}</td>
-                          <td>{formatNumber(item.stock)}</td>
-                          <td>{formatCurrency(item.unitPrice)}</td>
+                          <td className="text-right">{formatNumber(item.stock)}</td>
+                          <td className="text-right">{formatCurrency(item.unitPrice)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -581,22 +813,40 @@ const InventoryTable = () => {
                     <p className="preview-more">... and {uploadData.length - 5} more items</p>
                   )}
                 </div>
+                <div className="upload-warning">
+                  <p className="warning-text">
+                    ⚠️ Note: Items with the same name may create duplicates. Please review before confirming.
+                  </p>
+                </div>
               </div>
               <div className="modal-footer">
                 <button className="btn-cancel" onClick={() => setShowUploadModal(false)}>Cancel</button>
-                <button className="btn-confirm" onClick={handleUploadConfirm} disabled={uploadLoading}>
-                  {uploadLoading ? 'Uploading...' : 'Confirm Upload'}
+                <button
+                  className="btn-confirm"
+                  onClick={handleUploadConfirm}
+                  disabled={uploadLoading}
+                >
+                  {uploadLoading ? 'Uploading...' : `Confirm Upload (${uploadData.length} items)`}
                 </button>
               </div>
             </div>
           </div>
         )}
 
+        {/* Success Message */}
+        {success && (
+          <div className="alert-success">
+            <span className="success-icon">✓</span>
+            <span>{success}</span>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="alert-error">
-            <span className="alert-icon"></span>
+            <span className="error-icon">✗</span>
             <span>{error}</span>
+            <button className="alert-close" onClick={() => setError("")}>×</button>
           </div>
         )}
 
@@ -650,6 +900,11 @@ const InventoryTable = () => {
                     <td colSpan="9" className="empty-state">
                       <div className="empty-content">
                         <p>{searchTerm ? "No items match your search" : "No inventory items found"}</p>
+                        {!searchTerm && (
+                          <button onClick={() => setShowAddModal(true)} className="btn-add-first">
+                            Add Your First Item
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -680,9 +935,21 @@ const InventoryTable = () => {
                           </span>
                         </td>
                         <td className="text-center">
-                          <button onClick={() => handleEditItem(item)} className="edit-link">
-                            Edit
-                          </button>
+                          <div className="action-buttons">
+                            <button
+                              onClick={() => handleEditItem(item)}
+                              className="edit-link"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item._id, item.name)}
+                              className="delete-link"
+                              disabled={uploadLoading}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -724,28 +991,28 @@ const InventoryTable = () => {
         {/* Summary Cards */}
         <div className="summary-grid">
           <div className="summary-card">
-            <div className="summary-icon"></div>
+            <div className="summary-icon">📦</div>
             <div>
               <p className="summary-label">Total Items</p>
               <p className="summary-value">{inventory.length}</p>
             </div>
           </div>
           <div className="summary-card">
-            <div className="summary-icon"></div>
+            <div className="summary-icon">💰</div>
             <div>
               <p className="summary-label">Total Value</p>
               <p className="summary-value">{formatCurrency(calculateTotalValue())}</p>
             </div>
           </div>
           <div className="summary-card summary-warning">
-            <div className="summary-icon"></div>
+            <div className="summary-icon">⚠️</div>
             <div>
               <p className="summary-label">Low Stock Items</p>
               <p className="summary-value">{calculateLowStockCount()}</p>
             </div>
           </div>
           <div className="summary-card summary-danger">
-            <div className="summary-icon"></div>
+            <div className="summary-icon">❌</div>
             <div>
               <p className="summary-label">Out of Stock</p>
               <p className="summary-value">{calculateOutOfStockCount()}</p>

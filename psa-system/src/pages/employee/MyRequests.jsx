@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import "./MyRequests.css";
 
@@ -19,8 +19,12 @@ const MyRequests = () => {
     const [loadingInventory, setLoadingInventory] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
+    const [showSuggestions, setShowSuggestions] = useState(null);
+    const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(null);
+    const [suggestionPosition, setSuggestionPosition] = useState({});
 
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const inputRefs = useRef({});
 
     useEffect(() => {
         fetchInventoryItems();
@@ -30,7 +34,7 @@ const MyRequests = () => {
         setLoadingInventory(true);
         try {
             const token = localStorage.getItem("token");
-            const response = await axios.get(`${API_BASE_URL}/api/inventory`, {
+            const response = await axios.get(`${API_BASE_URL}/api/inventories`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const inventoryData = response.data.data || response.data || [];
@@ -40,6 +44,74 @@ const MyRequests = () => {
         } finally {
             setLoadingInventory(false);
         }
+    };
+
+    const getFilteredSuggestions = (searchTerm) => {
+        if (!searchTerm || searchTerm.trim() === "") return [];
+        const term = searchTerm.toLowerCase().trim();
+        return inventoryItems
+            .filter(item => (item.name || item.itemName || "").toLowerCase().includes(term))
+            .slice(0, 6);
+    };
+
+    const updateSuggestionPosition = (index) => {
+        if (inputRefs.current[index]) {
+            const rect = inputRefs.current[index].getBoundingClientRect();
+            setSuggestionPosition({
+                top: rect.bottom + window.scrollY,
+                left: rect.left + window.scrollX,
+                width: rect.width
+            });
+        }
+    };
+
+    const handleItemChange = (index, field, value) => {
+        const updated = [...items];
+
+        if (field === "itemName") {
+            updated[index].itemName = value;
+            if (value && value.trim() !== "") {
+                updateSuggestionPosition(index);
+                setShowSuggestions(index);
+            } else {
+                setShowSuggestions(null);
+            }
+            setActiveSuggestionIndex(null);
+        } else if (field === "quantity") {
+            const quantity = Number(value) || 0;
+            updated[index].quantity = quantity;
+            updated[index].totalPrice = quantity * (updated[index].unitPrice || 0);
+        } else {
+            updated[index][field] = value;
+        }
+
+        setItems(updated);
+        validateItem(updated[index], index);
+    };
+
+    const handleSelectSuggestion = (index, suggestion) => {
+        const updated = [...items];
+        const quantity = Number(updated[index].quantity) || 0;
+
+        updated[index].itemName = suggestion.name || suggestion.itemName;
+        updated[index].unit = suggestion.unit || "";
+        updated[index].category = suggestion.category || "";
+        updated[index].unitPrice = suggestion.unitPrice || suggestion.price || 0;
+        updated[index].totalPrice = quantity * (suggestion.unitPrice || suggestion.price || 0);
+
+        setItems(updated);
+        setShowSuggestions(null);
+        setActiveSuggestionIndex(null);
+        validateItem(updated[index], index);
+    };
+
+    const handleQuantityChange = (index, value) => {
+        const updated = [...items];
+        const quantity = Number(value) || 0;
+        updated[index].quantity = quantity;
+        updated[index].totalPrice = quantity * (updated[index].unitPrice || 0);
+        setItems(updated);
+        validateItem(updated[index], index);
     };
 
     const validateItem = (item, index) => {
@@ -61,37 +133,6 @@ const MyRequests = () => {
         return Object.keys(errors).length === 0;
     };
 
-    const handleItemChange = (index, field, value) => {
-        const updated = [...items];
-
-        if (field === "itemName") {
-            const selectedInventory = inventoryItems.find(item =>
-                (item.name === value || item.itemName === value) ||
-                (item.name?.toLowerCase() === value.toLowerCase() || item.itemName?.toLowerCase() === value.toLowerCase())
-            );
-
-            if (selectedInventory) {
-                updated[index].itemName = selectedInventory.name || selectedInventory.itemName;
-                updated[index].unit = selectedInventory.unit || "";
-                updated[index].category = selectedInventory.category || "office";
-                updated[index].unitPrice = selectedInventory.unitPrice || selectedInventory.price || 0;
-                const quantity = updated[index].quantity || 0;
-                updated[index].totalPrice = quantity * updated[index].unitPrice;
-            } else {
-                updated[index].itemName = value;
-            }
-        } else if (field === "quantity") {
-            const quantity = Number(value) || 0;
-            updated[index].quantity = quantity;
-            updated[index].totalPrice = quantity * (updated[index].unitPrice || 0);
-        } else {
-            updated[index][field] = value;
-        }
-
-        setItems(updated);
-        validateItem(updated[index], index);
-    };
-
     const addItem = () => {
         const newId = Math.max(...items.map(i => i.id), 0) + 1;
         setItems([...items, {
@@ -108,7 +149,9 @@ const MyRequests = () => {
 
     const removeItem = (index) => {
         if (items.length > 1) {
-            setItems(items.filter((_, i) => i !== index));
+            const updated = items.filter((_, i) => i !== index);
+            setItems(updated);
+            setShowSuggestions(null);
         }
     };
 
@@ -169,7 +212,7 @@ const MyRequests = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            setSuccessMessage("Requisition submitted successfully!");
+            setSuccessMessage("Requisition submitted successfully");
 
             setItems([{
                 id: 1,
@@ -207,14 +250,54 @@ const MyRequests = () => {
                 errors: {}
             }]);
             setNotes("");
+            setShowSuggestions(null);
         }
     };
+
+    const handleKeyDown = (e, index, suggestions) => {
+        if (!showSuggestions) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveSuggestionIndex(prev =>
+                prev === null ? 0 : Math.min(prev + 1, suggestions.length - 1)
+            );
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveSuggestionIndex(prev =>
+                prev === null ? suggestions.length - 1 : Math.max(prev - 1, 0)
+            );
+        } else if (e.key === 'Enter' && activeSuggestionIndex !== null) {
+            e.preventDefault();
+            handleSelectSuggestion(index, suggestions[activeSuggestionIndex]);
+        } else if (e.key === 'Escape') {
+            setShowSuggestions(null);
+            setActiveSuggestionIndex(null);
+        }
+    };
+
+    const handleFocus = (index, value) => {
+        if (value && value.trim() !== "") {
+            updateSuggestionPosition(index);
+            setShowSuggestions(index);
+        }
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (!e.target.closest('.suggestions-container') && !e.target.closest('.suggestions-dropdown-overlay')) {
+                setShowSuggestions(null);
+            }
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
 
     if (loadingInventory) {
         return (
             <div className="loading-container">
                 <div className="loading-spinner"></div>
-                <p className="loading-text">Loading inventory...</p>
+                <p>Loading inventory...</p>
             </div>
         );
     }
@@ -224,71 +307,64 @@ const MyRequests = () => {
             <div className="requests-wrapper">
                 {/* Header */}
                 <div className="requests-header">
-                    <h1 className="requests-title">Create New Requisition</h1>
-                    <p className="requests-subtitle">
-                        Fill out the form below to submit your request for approval
-                    </p>
+                    <h1>Create New Requisition</h1>
+                    <p>Fill out the form below to submit your request for approval</p>
                 </div>
 
                 {/* Messages */}
                 {successMessage && (
                     <div className="alert alert-success">
-                        <span className="alert-icon">✓</span>
-                        <span>{successMessage}</span>
+                        {successMessage}
                     </div>
                 )}
 
                 {errorMessage && (
                     <div className="alert alert-error">
-                        <span className="alert-icon">!</span>
-                        <span>{errorMessage}</span>
+                        {errorMessage}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="requests-form">
-                    {/* Items Card */}
-                    <div className="card">
-                        <div className="card-header">
-                            <h3 className="card-title">Request Items</h3>
+                <form onSubmit={handleSubmit}>
+                    {/* Items Section */}
+                    <div className="section">
+                        <div className="section-header">
+                            <h3>Request Items</h3>
                         </div>
-                        <div className="card-content">
-                            <div className="table-container">
-                                <table className="requests-table">
-                                    <thead>
-                                        <tr>
-                                            <th className="item-name-col">Item Name <span className="required">*</span></th>
-                                            <th className="quantity-col">Quantity <span className="required">*</span></th>
-                                            <th className="unit-col">Unit <span className="required">*</span></th>
-                                            <th className="price-col">Unit Price</th>
-                                            <th className="total-col">Total</th>
-                                            <th className="actions-col"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {items.map((item, index) => (
+
+                        <div className="table-wrapper">
+                            <table className="items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Item Name <span className="required">*</span></th>
+                                        <th>Quantity <span className="required">*</span></th>
+                                        <th>Unit <span className="required">*</span></th>
+                                        <th>Unit Price</th>
+                                        <th>Total</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {items.map((item, index) => {
+                                        const suggestions = getFilteredSuggestions(item.itemName);
+                                        return (
                                             <tr key={item.id}>
                                                 <td>
-                                                    <div className="search-input-wrapper">
+                                                    <div className="suggestions-container">
                                                         <input
+                                                            ref={el => inputRefs.current[index] = el}
                                                             type="text"
-                                                            list={`inventory-list-${index}`}
                                                             value={item.itemName}
                                                             onChange={(e) => handleItemChange(index, "itemName", e.target.value)}
-                                                            className={`form-input ${item.errors.itemName ? 'error' : ''}`}
-                                                            placeholder="Search inventory..."
+                                                            onFocus={() => handleFocus(index, item.itemName)}
+                                                            onKeyDown={(e) => handleKeyDown(e, index, suggestions)}
+                                                            className={item.errors.itemName ? 'error' : ''}
+                                                            placeholder="Type item name..."
                                                             autoComplete="off"
                                                         />
-                                                        <datalist id={`inventory-list-${index}`}>
-                                                            {inventoryItems.map(invItem => (
-                                                                <option key={invItem._id} value={invItem.name || invItem.itemName}>
-                                                                    {invItem.name || invItem.itemName} - {formatCurrency(invItem.unitPrice || invItem.price)} / {invItem.unit}
-                                                                </option>
-                                                            ))}
-                                                        </datalist>
+                                                        {item.errors.itemName && (
+                                                            <span className="error-text">{item.errors.itemName}</span>
+                                                        )}
                                                     </div>
-                                                    {item.errors.itemName && (
-                                                        <p className="error-text">{item.errors.itemName}</p>
-                                                    )}
                                                 </td>
                                                 <td>
                                                     <input
@@ -296,33 +372,31 @@ const MyRequests = () => {
                                                         min="1"
                                                         step="1"
                                                         value={item.quantity}
-                                                        onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                                                        className={`form-input quantity-input ${item.errors.quantity ? 'error' : ''}`}
+                                                        onChange={(e) => handleQuantityChange(index, e.target.value)}
+                                                        className={item.errors.quantity ? 'error' : ''}
                                                         placeholder="0"
                                                     />
                                                     {item.errors.quantity && (
-                                                        <p className="error-text">{item.errors.quantity}</p>
+                                                        <span className="error-text">{item.errors.quantity}</span>
                                                     )}
                                                 </td>
                                                 <td>
                                                     <select
                                                         value={item.unit}
                                                         onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                                                        className={`form-select ${item.errors.unit ? 'error' : ''}`}
+                                                        className={item.errors.unit ? 'error' : ''}
                                                     >
-                                                        <option value="">Select unit</option>
+                                                        <option value="">Select</option>
                                                         <option value="piece">Piece</option>
                                                         <option value="roll">Roll</option>
                                                         <option value="ream">Ream</option>
                                                         <option value="box">Box</option>
-                                                        <option value="book">Book</option>
                                                         <option value="pack">Pack</option>
                                                         <option value="set">Set</option>
                                                         <option value="bottle">Bottle</option>
-                                                        <option value="toner">Toner</option>
                                                     </select>
                                                     {item.errors.unit && (
-                                                        <p className="error-text">{item.errors.unit}</p>
+                                                        <span className="error-text">{item.errors.unit}</span>
                                                     )}
                                                 </td>
                                                 <td className="price-cell">
@@ -331,104 +405,113 @@ const MyRequests = () => {
                                                 <td className="total-cell">
                                                     {formatCurrency(item.totalPrice)}
                                                 </td>
-                                                <td className="actions-cell">
+                                                <td>
                                                     {items.length > 1 && (
                                                         <button
                                                             type="button"
                                                             onClick={() => removeItem(index)}
                                                             className="remove-btn"
-                                                            title="Remove item"
                                                         >
-                                                            ×
+                                                            Remove
                                                         </button>
                                                     )}
                                                 </td>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
 
-                            <div className="add-item-section">
-                                <button type="button" className="btn-outline" onClick={addItem}>
-                                    <span className="btn-icon">+</span>
-                                    Add Another Item
-                                </button>
-                            </div>
+                        <div className="add-item">
+                            <button type="button" onClick={addItem}>
+                                + Add Another Item
+                            </button>
+                        </div>
 
-                            {/* Summary Row */}
-                            <div className="summary-section">
-                                <div className="summary-card">
-                                    <div className="summary-label">Overall Total:</div>
-                                    <div className="summary-value">{formatCurrency(calculateOverallTotal())}</div>
-                                </div>
+                        <div className="summary">
+                            <div className="summary-row">
+                                <span>Total Amount:</span>
+                                <span>{formatCurrency(calculateOverallTotal())}</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Notes Card */}
-                    <div className="card">
-                        <div className="card-header">
-                            <h3 className="card-title">Additional Notes</h3>
-                            <p className="card-description">Any special instructions or comments</p>
+                    {/* Notes Section */}
+                    <div className="section">
+                        <div className="section-header">
+                            <h3>Additional Notes</h3>
+                            <p>Optional - Any special instructions or comments</p>
                         </div>
-                        <div className="card-content">
-                            <textarea
-                                className="form-textarea"
-                                placeholder="Enter any additional notes or special requirements here..."
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                rows={4}
-                            />
-                        </div>
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows="4"
+                            placeholder="Enter any additional notes here..."
+                        />
                     </div>
 
-                    {/* Stats Cards */}
-                    <div className="stats-grid">
-                        <div className="stat-card">
-                            <div>
-                                <p className="stat-label">Total Items</p>
-                                <p className="stat-value">{items.length}</p>
-                            </div>
+                    {/* Summary Stats */}
+                    <div className="stats">
+                        <div className="stat">
+                            <span>Items</span>
+                            <strong>{items.length}</strong>
                         </div>
-                        <div className="stat-card">
-                            <div>
-                                <p className="stat-label">Total Quantity</p>
-                                <p className="stat-value">{calculateTotalQuantity()}</p>
-                            </div>
+                        <div className="stat">
+                            <span>Total Quantity</span>
+                            <strong>{calculateTotalQuantity()}</strong>
                         </div>
-                        <div className="stat-card">
-                            <div>
-                                <p className="stat-label">Overall Total</p>
-                                <p className="stat-value stat-value-primary">{formatCurrency(calculateOverallTotal())}</p>
-                            </div>
+                        <div className="stat">
+                            <span>Overall Total</span>
+                            <strong>{formatCurrency(calculateOverallTotal())}</strong>
                         </div>
                     </div>
 
                     {/* Form Actions */}
-                    <div className="form-actions">
-                        <button type="button" className="btn-secondary" onClick={handleClear}>
+                    <div className="actions">
+                        <button type="button" onClick={handleClear}>
                             Clear Form
                         </button>
-                        <button type="submit" className="btn-primary" disabled={submitting}>
-                            {submitting ? (
-                                <>
-                                    <span className="spinner-small"></span>
-                                    Submitting...
-                                </>
-                            ) : (
-                                'Submit Requisition'
-                            )}
+                        <button type="submit" disabled={submitting}>
+                            {submitting ? 'Submitting...' : 'Submit Requisition'}
                         </button>
                     </div>
 
                     {/* Help Text */}
-                    <div className="help-text">
-                        <p>Fields marked with <span className="required-text">*</span> are required.</p>
-                        <p>Your request will be reviewed by the approver before processing.</p>
+                    <div className="help">
+                        <p>Fields marked with * are required.</p>
+                        <p>Your request will be reviewed before processing.</p>
                     </div>
                 </form>
             </div>
+
+            {/* Global Suggestions Dropdown - Overlays the page */}
+            {showSuggestions !== null && getFilteredSuggestions(items[showSuggestions]?.itemName).length > 0 && (
+                <div
+                    className="suggestions-dropdown-overlay"
+                    style={{
+                        position: 'fixed',
+                        top: suggestionPosition.top,
+                        left: suggestionPosition.left,
+                        width: suggestionPosition.width,
+                        zIndex: 1000
+                    }}
+                >
+                    <ul className="suggestions-list">
+                        {getFilteredSuggestions(items[showSuggestions]?.itemName).map((suggestion, idx) => (
+                            <li
+                                key={suggestion._id}
+                                className={activeSuggestionIndex === idx ? 'active' : ''}
+                                onClick={() => handleSelectSuggestion(showSuggestions, suggestion)}
+                            >
+                                <span className="suggestion-name">{suggestion.name || suggestion.itemName}</span>
+                                <span className="suggestion-unit">{suggestion.unit}</span>
+                                <span className="suggestion-price">{formatCurrency(suggestion.unitPrice || suggestion.price)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </div>
     );
 };

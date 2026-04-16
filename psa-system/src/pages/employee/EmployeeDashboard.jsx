@@ -12,7 +12,6 @@ export default function EmployeeDashboard() {
     const [sortBy, setSortBy] = useState("date");
     const [sortOrder, setSortOrder] = useState("desc");
     const [selectedRequest, setSelectedRequest] = useState(null);
-    const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [viewMode, setViewMode] = useState("list");
 
     // Get user data
@@ -21,6 +20,7 @@ export default function EmployeeDashboard() {
         const token = localStorage.getItem('token');
 
         if (!userData || !token) {
+            window.location.href = '/login';
             return;
         }
 
@@ -32,40 +32,87 @@ export default function EmployeeDashboard() {
         }
     }, []);
 
+    // Fetch only current user's requisitions
     const fetchRequisitions = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
             const token = localStorage.getItem("token");
-            const response = await fetch("http://localhost:5000/api/requisitions", {
-                headers: { Authorization: `Bearer ${token}` }
+            if (!token) {
+                throw new Error("No authentication token found");
+            }
+
+            // Get user ID from localStorage
+            const userData = localStorage.getItem('user');
+            const currentUser = JSON.parse(userData);
+            const userId = currentUser?.id || currentUser?._id;
+
+            // Fetch requisitions with user filter
+            const response = await fetch(`http://localhost:5000/api/requisitions/user/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
-            if (!response.ok) throw new Error("Failed to fetch requisitions");
+            if (!response.ok) {
+                if (response.status === 401) {
+                    throw new Error("Unauthorized. Please login again.");
+                }
+                if (response.status === 404) {
+                    setRequisitions([]);
+                    return;
+                }
+                throw new Error(`Failed to fetch requisitions: ${response.status}`);
+            }
+
             const data = await response.json();
-            setRequisitions(Array.isArray(data) ? data : [])
+
+            let requisitionsArray = [];
+            if (Array.isArray(data)) {
+                requisitionsArray = data;
+            } else if (data.data && Array.isArray(data.data)) {
+                requisitionsArray = data.data;
+            } else if (data.requisitions && Array.isArray(data.requisitions)) {
+                requisitionsArray = data.requisitions;
+            }
+
+            setRequisitions(requisitionsArray);
         } catch (error) {
             console.error("Fetch requisitions error:", error);
-            setError('Failed to load requisitions. Please try again.');
+            setError(error.message || 'Failed to load your requisitions. Please try again.');
         } finally {
             setLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchRequisitions();
-    }, [fetchRequisitions]);
+        if (user) {
+            fetchRequisitions();
+        }
+    }, [fetchRequisitions, user]);
+
+    const safeParseDate = (dateValue) => {
+        if (!dateValue) return null;
+        try {
+            const parsedDate = new Date(dateValue);
+            if (isNaN(parsedDate.getTime())) return null;
+            return parsedDate;
+        } catch (error) {
+            return null;
+        }
+    };
 
     const stats = useMemo(() => {
         const now = new Date();
         const thisMonth = requisitions.filter(r => {
-            const date = new Date(r.createdAt);
-            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            const date = safeParseDate(r.createdAt);
+            return date && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         });
 
-        const pending = requisitions.filter(r => r.status === "Pending");
-        const approved = requisitions.filter(r => r.status === "Approved");
-        const rejected = requisitions.filter(r => r.status === "Rejected");
+        const pending = requisitions.filter(r => r.status === "Pending" || r.status === "pending");
+        const approved = requisitions.filter(r => r.status === "Approved" || r.status === "approved");
+        const rejected = requisitions.filter(r => r.status === "Rejected" || r.status === "rejected");
 
         return {
             total: requisitions.length,
@@ -78,35 +125,41 @@ export default function EmployeeDashboard() {
     }, [requisitions]);
 
     const filtered = useMemo(() => {
-        let result = requisitions;
+        let result = [...requisitions];
 
         if (filter !== "All") {
-            result = result.filter(r => r.status === filter);
+            result = result.filter(r => r.status?.toLowerCase() === filter.toLowerCase());
         }
 
         if (searchTerm) {
+            const term = searchTerm.toLowerCase();
             result = result.filter(r =>
-                (r.title || r.itemName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (r.requestNumber || r._id || "").toLowerCase().includes(searchTerm.toLowerCase())
+                (r.title || r.itemName || "").toLowerCase().includes(term) ||
+                (r.requestNumber || r._id || "").toLowerCase().includes(term) ||
+                (r.category || "").toLowerCase().includes(term)
             );
         }
 
-        result = [...result].sort((a, b) => {
+        result.sort((a, b) => {
             if (sortBy === "date") {
-                return sortOrder === "desc"
-                    ? new Date(b.createdAt) - new Date(a.createdAt)
-                    : new Date(a.createdAt) - new Date(b.createdAt);
+                const dateA = safeParseDate(a.createdAt);
+                const dateB = safeParseDate(b.createdAt);
+                const timeA = dateA ? dateA.getTime() : 0;
+                const timeB = dateB ? dateB.getTime() : 0;
+                return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
             }
             if (sortBy === "status") {
+                const statusA = a.status || "";
+                const statusB = b.status || "";
                 return sortOrder === "desc"
-                    ? (b.status || "").localeCompare(a.status || "")
-                    : (a.status || "").localeCompare(b.status || "");
+                    ? statusB.localeCompare(statusA)
+                    : statusA.localeCompare(statusB);
             }
             if (sortBy === "priority") {
                 const priorityOrder = { high: 3, medium: 2, low: 1 };
-                return sortOrder === "desc"
-                    ? (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0)
-                    : (priorityOrder[a.priority] || 0) - (priorityOrder[b.priority] || 0);
+                const priorityA = priorityOrder[a.priority?.toLowerCase()] || 0;
+                const priorityB = priorityOrder[b.priority?.toLowerCase()] || 0;
+                return sortOrder === "desc" ? priorityB - priorityA : priorityA - priorityB;
             }
             return 0;
         });
@@ -141,7 +194,10 @@ export default function EmployeeDashboard() {
 
         for (let i = 1; i <= daysInMonth; i++) {
             const ds = `${calDate.getFullYear()}-${String(calDate.getMonth() + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
-            const hasEvent = requisitions.some(r => r.createdAt?.slice(0, 10) === ds);
+            const hasEvent = requisitions.some(r => {
+                const date = safeParseDate(r.createdAt);
+                return date && date.toISOString().slice(0, 10) === ds;
+            });
             const isToday = today.getDate() === i && today.getMonth() === calDate.getMonth() && today.getFullYear() === calDate.getFullYear();
 
             let dayClass = "date";
@@ -193,26 +249,46 @@ export default function EmployeeDashboard() {
         }
     };
 
-    const handleExport = () => {
-        const data = JSON.stringify(filtered, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `requisitions_${new Date().toISOString()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+    const getTotalAmount = (request) => {
+        if (request.totalPrice) return request.totalPrice;
+        if (request.total_amount) return request.total_amount;
+        if (request.items && request.items.length) {
+            return request.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+        }
+        return 0;
     };
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (showProfileMenu && !event.target.closest('.profile-menu')) {
-                setShowProfileMenu(false);
-            }
-        };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, [showProfileMenu]);
+    const getItemCount = (request) => {
+        if (request.items) return request.items.length;
+        if (request.itemName) return 1;
+        return 0;
+    };
+
+    const daysAgoLabel = (date) => {
+        const parsedDate = safeParseDate(date);
+        if (!parsedDate) return "N/A";
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const d = new Date(parsedDate);
+        d.setHours(0, 0, 0, 0);
+        const diff = Math.floor((today - d) / 86400000);
+
+        if (diff === 0) return "Today";
+        if (diff === 1) return "Yesterday";
+        if (diff < 7) return `${diff} days ago`;
+        if (diff < 30) return `${Math.floor(diff / 7)} weeks ago`;
+        if (diff < 365) return `${Math.floor(diff / 30)} months ago`;
+        return `${Math.floor(diff / 365)} years ago`;
+    };
+
+    const formatTotalAmount = (amount) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'PHP',
+            minimumFractionDigits: 2
+        }).format(amount || 0);
+    };
 
     if (loading) {
         return (
@@ -248,7 +324,7 @@ export default function EmployeeDashboard() {
             <div className="dashboard-header">
                 <div className="flex-between">
                     <div>
-                        <h1>{getGreeting()}, {user?.fullName?.split(' ')[0] || 'Employee'}!</h1>
+                        <h1>{getGreeting()}, {user?.fullName?.split(' ')[0] || user?.name?.split(' ')[0] || 'Employee'}!</h1>
                         <p>
                             {new Date().toLocaleDateString('en-US', {
                                 weekday: 'long',
@@ -265,7 +341,7 @@ export default function EmployeeDashboard() {
             <div className="dashboard-cards">
                 <div className="card">
                     <div className="card-content">
-                        <h3>Total Requests</h3>
+                        <h3>My Requests</h3>
                         <div className="card-value">{stats.total}</div>
                         <div className="card-change">This month: +{stats.thisMonth}</div>
                     </div>
@@ -302,35 +378,19 @@ export default function EmployeeDashboard() {
                 <div className="dashboard-section">
                     <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
                         <h2>My Requests</h2>
-                        <div className="flex gap-2">
+                        <div className="view-toggle">
                             <button
-                                onClick={fetchRequisitions}
-                                className="icon-button"
-                                title="Refresh"
+                                onClick={() => setViewMode("list")}
+                                className={`toggle-btn ${viewMode === "list" ? "active" : ""}`}
                             >
-                                ↻
+                                List
                             </button>
                             <button
-                                onClick={handleExport}
-                                className="icon-button"
-                                title="Export"
+                                onClick={() => setViewMode("grid")}
+                                className={`toggle-btn ${viewMode === "grid" ? "active" : ""}`}
                             >
-                                ↓
+                                Grid
                             </button>
-                            <div className="view-toggle">
-                                <button
-                                    onClick={() => setViewMode("list")}
-                                    className={`toggle-btn ${viewMode === "list" ? "active" : ""}`}
-                                >
-                                    List
-                                </button>
-                                <button
-                                    onClick={() => setViewMode("grid")}
-                                    className={`toggle-btn ${viewMode === "grid" ? "active" : ""}`}
-                                >
-                                    Grid
-                                </button>
-                            </div>
                         </div>
                     </div>
 
@@ -340,11 +400,19 @@ export default function EmployeeDashboard() {
                             <span className="search-icon">🔍</span>
                             <input
                                 type="text"
-                                placeholder="Search by title or ID..."
+                                placeholder="Search my requests..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="search-input"
                             />
+                            {searchTerm && (
+                                <button
+                                    className="clear-search"
+                                    onClick={() => setSearchTerm("")}
+                                >
+                                    ✕
+                                </button>
+                            )}
                         </div>
 
                         <div className="sort-controls">
@@ -391,81 +459,114 @@ export default function EmployeeDashboard() {
                                     <thead>
                                         <tr>
                                             <th>ID</th>
-                                            <th>Title</th>
+                                            <th>Title / Items</th>
                                             <th>Status</th>
                                             <th>Priority</th>
                                             <th>Created</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filtered.map((r) => (
-                                            <tr
-                                                key={r._id}
-                                                className="cursor-pointer"
-                                                onClick={() => setSelectedRequest(r)}
-                                            >
-                                                <td>
-                                                    <span className="request-id">
-                                                        {r.requestNumber || r._id?.slice(-6)}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <div className="request-title">
-                                                        {r.title || r.itemName}
+                                        {filtered.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="5" className="text-center py-8">
+                                                    <div className="empty-state-small">
+                                                        <p>No requests found</p>
+                                                        <p className="text-sm text-secondary">Create your first requisition</p>
                                                     </div>
                                                 </td>
-                                                <td>
-                                                    <span className={`badge ${badgeClass(r.status)}`}>
-                                                        {r.status}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span className={`badge ${priorityClass(r.priority)}`}>
-                                                        {r.priority}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span className="text-secondary text-sm">{daysAgoLabel(r.createdAt)}</span>
-                                                </td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            filtered.map((r) => (
+                                                <tr
+                                                    key={r._id}
+                                                    className="cursor-pointer"
+                                                    onClick={() => setSelectedRequest(r)}
+                                                >
+                                                    <td>
+                                                        <span className="request-id">
+                                                            {r.requestNumber || r._id?.slice(-8)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="request-title">
+                                                            {r.title || r.itemName || "Untitled"}
+                                                        </div>
+                                                        {r.items && r.items.length > 0 && (
+                                                            <div className="request-subtitle">
+                                                                {r.items.length} item(s) • {formatTotalAmount(getTotalAmount(r))}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <span className={`badge ${badgeClass(r.status)}`}>
+                                                            {r.status || "Pending"}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {r.priority && (
+                                                            <span className={`badge ${priorityClass(r.priority)}`}>
+                                                                {r.priority}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <span className="text-secondary text-sm">{daysAgoLabel(r.createdAt)}</span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         ) : (
                             <div className="grid-view">
-                                {filtered.map((r) => (
-                                    <div
-                                        key={r._id}
-                                        className="grid-card"
-                                        onClick={() => setSelectedRequest(r)}
-                                    >
-                                        <div className="flex-between mb-2">
-                                            <div className="flex-1">
-                                                <h3 className="font-medium">{r.title || r.itemName}</h3>
-                                                <p className="text-xs text-secondary mt-1">
-                                                    ID: {r.requestNumber || r._id?.slice(-6)}
-                                                </p>
-                                            </div>
-                                            <span className={`badge ${priorityClass(r.priority)}`}>
-                                                {r.priority}
-                                            </span>
-                                        </div>
-                                        <div className="flex-between mt-3">
-                                            <span className={`badge ${badgeClass(r.status)}`}>
-                                                {r.status}
-                                            </span>
-                                            <span className="text-xs text-secondary">{daysAgoLabel(r.createdAt)}</span>
-                                        </div>
+                                {filtered.length === 0 ? (
+                                    <div className="empty-state">
+                                        <div className="empty-icon">📋</div>
+                                        <p className="text-secondary font-medium">No requests found</p>
+                                        <p className="text-sm text-secondary mt-1">Create your first requisition</p>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {filtered.length === 0 && (
-                            <div className="empty-state">
-                                <p className="text-secondary font-medium">No requests found</p>
-                                <p className="text-sm text-secondary mt-1">Try adjusting your search or filters</p>
+                                ) : (
+                                    filtered.map((r) => (
+                                        <div
+                                            key={r._id}
+                                            className="grid-card"
+                                            onClick={() => setSelectedRequest(r)}
+                                        >
+                                            <div className="flex-between mb-2">
+                                                <div className="flex-1">
+                                                    <h3 className="font-medium">{r.title || r.itemName || "Untitled"}</h3>
+                                                    <p className="text-xs text-secondary mt-1">
+                                                        ID: {r.requestNumber || r._id?.slice(-8)}
+                                                    </p>
+                                                </div>
+                                                {r.priority && (
+                                                    <span className={`badge ${priorityClass(r.priority)}`}>
+                                                        {r.priority}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="grid-card-details">
+                                                <div className="detail-item">
+                                                    <span>Items:</span>
+                                                    <strong>{getItemCount(r)}</strong>
+                                                </div>
+                                                <div className="detail-item">
+                                                    <span>Amount:</span>
+                                                    <strong>{formatTotalAmount(getTotalAmount(r))}</strong>
+                                                </div>
+                                            </div>
+                                            <div className="flex-between mt-3">
+                                                <span className={`badge ${badgeClass(r.status)}`}>
+                                                    {r.status || "Pending"}
+                                                </span>
+                                                <span className="text-xs text-secondary">
+                                                    {daysAgoLabel(r.createdAt)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         )}
                     </div>
@@ -483,12 +584,29 @@ export default function EmployeeDashboard() {
 
                 {/* Right Sidebar */}
                 <div className="dashboard-sidebar">
+                    {/* Summary Card */}
+                    <div className="dashboard-section">
+                        <h2>My Summary</h2>
+                        <div className="summary-stats">
+                            <div className="summary-item">
+                                <span>Total Spent</span>
+                                <strong>{formatTotalAmount(requisitions.reduce((sum, r) => sum + getTotalAmount(r), 0))}</strong>
+                            </div>
+                            <div className="summary-item">
+                                <span>Average Request</span>
+                                <strong>{formatTotalAmount(requisitions.reduce((sum, r) => sum + getTotalAmount(r), 0) / (requisitions.length || 1))}</strong>
+                            </div>
+                            <div className="summary-item">
+                                <span>Pending Value</span>
+                                <strong>{formatTotalAmount(requisitions.filter(r => r.status === "Pending").reduce((sum, r) => sum + getTotalAmount(r), 0))}</strong>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Calendar Card */}
                     <div className="dashboard-section">
                         <div className="flex-between mb-4">
-                            <div className="flex-center gap-2">
-                                <h2>Activity Calendar</h2>
-                            </div>
+                            <h2>My Activity</h2>
                             <div className="flex gap-1">
                                 <button
                                     onClick={() => setCalDate(new Date(calDate.getFullYear(), calDate.getMonth() - 1, 1))}
@@ -527,16 +645,19 @@ export default function EmployeeDashboard() {
                         <div className="activity-list">
                             {filtered.slice(0, 5).map((r) => (
                                 <div key={r._id} className="activity-item">
-                                    <div className="activity-dot"></div>
+                                    <div className={`activity-dot status-${r.status?.toLowerCase() || 'pending'}`}></div>
                                     <div className="flex-1">
-                                        <p className="font-medium text-sm">{r.title || r.itemName}</p>
+                                        <p className="font-medium text-sm">{r.title || r.itemName || "Untitled"}</p>
                                         <p className="text-xs text-secondary">{daysAgoLabel(r.createdAt)}</p>
                                     </div>
                                     <span className={`badge ${badgeClass(r.status)}`}>
-                                        {r.status}
+                                        {r.status || "Pending"}
                                     </span>
                                 </div>
                             ))}
+                            {filtered.length === 0 && (
+                                <p className="text-secondary text-sm text-center">No recent activity</p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -560,25 +681,69 @@ export default function EmployeeDashboard() {
                                 </div>
                                 <div>
                                     <label className="detail-label">Status</label>
-                                    <p className={`badge ${badgeClass(selectedRequest.status)}`}>{selectedRequest.status}</p>
+                                    <p><span className={`badge ${badgeClass(selectedRequest.status)}`}>{selectedRequest.status || "Pending"}</span></p>
                                 </div>
                                 <div>
                                     <label className="detail-label">Title</label>
-                                    <p className="font-medium">{selectedRequest.title || selectedRequest.itemName}</p>
+                                    <p className="font-medium">{selectedRequest.title || selectedRequest.itemName || "Untitled"}</p>
                                 </div>
                                 <div>
                                     <label className="detail-label">Priority</label>
-                                    <p className={`badge ${priorityClass(selectedRequest.priority)}`}>{selectedRequest.priority}</p>
+                                    <p>{selectedRequest.priority ? (
+                                        <span className={`badge ${priorityClass(selectedRequest.priority)}`}>
+                                            {selectedRequest.priority}
+                                        </span>
+                                    ) : "Not set"}</p>
+                                </div>
+                                <div>
+                                    <label className="detail-label">Total Amount</label>
+                                    <p className="font-medium text-primary">{formatTotalAmount(getTotalAmount(selectedRequest))}</p>
+                                </div>
+                                <div>
+                                    <label className="detail-label">Items Count</label>
+                                    <p>{getItemCount(selectedRequest)}</p>
                                 </div>
                                 <div>
                                     <label className="detail-label">Created</label>
-                                    <p>{new Date(selectedRequest.createdAt).toLocaleString()}</p>
+                                    <p>{selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleString() : "N/A"}</p>
                                 </div>
                                 <div>
                                     <label className="detail-label">Last Updated</label>
-                                    <p>{new Date(selectedRequest.updatedAt).toLocaleString()}</p>
+                                    <p>{selectedRequest.updatedAt ? new Date(selectedRequest.updatedAt).toLocaleString() : "N/A"}</p>
                                 </div>
                             </div>
+
+                            {/* Items List */}
+                            {selectedRequest.items && selectedRequest.items.length > 0 && (
+                                <div className="mt-4">
+                                    <label className="detail-label">Items Requested</label>
+                                    <div className="items-list">
+                                        <table className="items-table-modal">
+                                            <thead>
+                                                <tr>
+                                                    <th>Item</th>
+                                                    <th>Quantity</th>
+                                                    <th>Unit</th>
+                                                    <th>Unit Price</th>
+                                                    <th>Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {selectedRequest.items.map((item, idx) => (
+                                                    <tr key={idx}>
+                                                        <td>{item.itemName}</td>
+                                                        <td className="text-center">{item.quantity}</td>
+                                                        <td>{item.unit}</td>
+                                                        <td className="text-right">{formatTotalAmount(item.unitPrice)}</td>
+                                                        <td className="text-right">{formatTotalAmount(item.totalPrice)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
                             {selectedRequest.notes && (
                                 <div className="mt-4">
                                     <label className="detail-label">Notes</label>
@@ -597,19 +762,3 @@ export default function EmployeeDashboard() {
         </div>
     );
 }
-
-// Helper function
-const daysAgoLabel = (date) => {
-    if (!date) return "N/A";
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    const diff = Math.floor((today - d) / 86400000);
-
-    if (diff === 0) return "Today";
-    if (diff === 1) return "Yesterday";
-    if (diff < 7) return `${diff} days ago`;
-    if (diff < 30) return `${Math.floor(diff / 7)} weeks ago`;
-    return `${Math.floor(diff / 30)} months ago`;
-};
