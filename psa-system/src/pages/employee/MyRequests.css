@@ -1,4 +1,4 @@
-/* MyRequests.css - Simple Professional Design with Overlapping Dropdown */
+/* MyRequests.css - Simple Professional Design */
 
 * {
     margin: 0;
@@ -17,7 +17,6 @@ body {
     min-height: 100vh;
     background: #f5f5f5;
     padding: 40px 20px;
-    position: relative;
 }
 
 .requests-wrapper {
@@ -149,42 +148,33 @@ input.error, select.error {
     margin-top: 4px;
 }
 
-/* Suggestions Container - No relative positioning needed */
+/* Suggestions Dropdown */
 .suggestions-container {
-    width: 100%;
-}
-
-/* Global Suggestions Dropdown - Overlapping */
-.suggestions-dropdown-overlay {
-    position: fixed;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
-    overflow: hidden;
+    position: relative;
 }
 
 .suggestions-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-height: 240px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-top: none;
+    max-height: 200px;
     overflow-y: auto;
+    z-index: 100;
+    list-style: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .suggestions-list li {
-    padding: 10px 12px;
+    padding: 8px 12px;
     cursor: pointer;
     display: flex;
     gap: 12px;
     font-size: 13px;
     border-bottom: 1px solid #f0f0f0;
-    transition: background 0.15s ease;
-}
-
-.suggestions-list li:last-child {
-    border-bottom: none;
 }
 
 .suggestions-list li:hover,
@@ -192,25 +182,18 @@ input.error, select.error {
     background: #f5f5f5;
 }
 
-.suggestion-name {
+.suggestions-list li span:first-child {
     flex: 1;
-    font-weight: 500;
-    color: #333;
 }
 
 .suggestion-unit {
     color: #666;
     font-size: 12px;
-    min-width: 60px;
-    text-align: right;
 }
 
 .suggestion-price {
     color: #2e7d32;
     font-weight: 500;
-    font-size: 12px;
-    min-width: 70px;
-    text-align: right;
 }
 
 /* Price and Total Cells */
@@ -408,24 +391,6 @@ textarea {
     font-size: 14px;
 }
 
-/* Scrollbar for suggestions */
-.suggestions-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.suggestions-list::-webkit-scrollbar-track {
-    background: #f0f0f0;
-}
-
-.suggestions-list::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 3px;
-}
-
-.suggestions-list::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
     .requests-wrapper {
@@ -469,18 +434,10 @@ textarea {
         margin-right: 16px;
     }
     
-    .suggestions-dropdown-overlay {
-        left: 20px !important;
-        right: 20px !important;
-        width: auto !important;
-    }
-    
-    .suggestions-list li {
-        flex-wrap: wrap;
-    }
-    
-    .suggestion-unit,
-    .suggestion-price {
-        min-width: auto;
+    .suggestions-list {
+        position: fixed;
+        left: 20px;
+        right: 20px;
+        z-index: 1000;
     }
 }

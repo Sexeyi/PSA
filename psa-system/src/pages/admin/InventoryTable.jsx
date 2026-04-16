@@ -80,7 +80,6 @@ const InventoryTable = () => {
     fetchInventory();
   }, []);
 
-  // Clear success message after 3 seconds
   useEffect(() => {
     if (success) {
       const timer = setTimeout(() => setSuccess(""), 3000);
@@ -113,7 +112,7 @@ const InventoryTable = () => {
 
   const handleSupplyAdded = (newSupply) => {
     fetchInventory();
-    setSuccess("New supply added successfully!");
+    setSuccess("New supply added successfully");
   };
 
   const handleSelectItem = (itemId) => {
@@ -166,7 +165,7 @@ const InventoryTable = () => {
       }
 
       await fetchInventory();
-      setSuccess(`"${itemName}" deleted successfully!`);
+      setSuccess(`"${itemName}" deleted successfully`);
 
     } catch (error) {
       console.error("Delete error:", error);
@@ -196,7 +195,7 @@ const InventoryTable = () => {
       await fetchInventory();
       setShowEditModal(false);
       setCurrentEditItem(null);
-      setSuccess("Item updated successfully!");
+      setSuccess("Item updated successfully");
 
     } catch (error) {
       console.error("Edit error:", error);
@@ -247,7 +246,7 @@ const InventoryTable = () => {
       setSelectedItems([]);
       setBulkEditField("");
       setBulkEditValue("");
-      setSuccess(`${selectedItems.length} item(s) updated successfully!`);
+      setSuccess(`${selectedItems.length} item(s) updated successfully`);
 
     } catch (error) {
       console.error("Bulk edit error:", error);
@@ -285,7 +284,7 @@ const InventoryTable = () => {
       } else {
         await fetchInventory();
         setSelectedItems([]);
-        setSuccess(`${selectedItems.length} item(s) deleted successfully!`);
+        setSuccess(`${selectedItems.length} item(s) deleted successfully`);
       }
 
     } catch (error) {
@@ -296,7 +295,6 @@ const InventoryTable = () => {
     }
   };
 
-  // Enhanced Excel file upload handler for grouped columns
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -312,8 +310,6 @@ const InventoryTable = () => {
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-
-        // Get all rows as array
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
         if (!rows || rows.length === 0) {
@@ -322,11 +318,9 @@ const InventoryTable = () => {
           return;
         }
 
-        // Find the header row and data start row
         let headerRowIndex = -1;
         let dataStartRow = -1;
 
-        // Look for header indicators (usually contains "name", "unit", etc.)
         for (let i = 0; i < Math.min(10, rows.length); i++) {
           const row = rows[i];
           if (!row || row.length === 0) continue;
@@ -334,7 +328,6 @@ const InventoryTable = () => {
           const firstCell = (row[0] || "").toString().toLowerCase();
           const secondCell = (row[1] || "").toString().toLowerCase();
 
-          // Check if this looks like a header row
           if (firstCell === "name" || firstCell === "item name" || firstCell === "item" ||
             (firstCell === "a" && secondCell === "b") ||
             (firstCell === "product" && secondCell === "unit")) {
@@ -344,7 +337,6 @@ const InventoryTable = () => {
           }
         }
 
-        // If no header found, assume first row is header and data starts from row 1
         if (headerRowIndex === -1) {
           headerRowIndex = 0;
           dataStartRow = 1;
@@ -353,7 +345,6 @@ const InventoryTable = () => {
         const parsedData = [];
         const previewData = [];
 
-        // Parse each data row
         for (let i = dataStartRow; i < rows.length; i++) {
           const row = rows[i];
           if (!row || row.length < 2) continue;
@@ -361,7 +352,6 @@ const InventoryTable = () => {
           let name = row[0];
           let unit = row[1];
 
-          // Handle if name/unit are in different positions
           if (!name && row[1]) {
             name = row[1];
             unit = row[2];
@@ -369,11 +359,9 @@ const InventoryTable = () => {
 
           if (!name || !unit) continue;
 
-          // Clean up the values
           name = name.toString().trim();
           unit = unit.toString().trim();
 
-          // Skip summary or total rows
           const lowerName = name.toLowerCase();
           if (lowerName.includes("consumables") ||
             lowerName.includes("covid") ||
@@ -383,8 +371,6 @@ const InventoryTable = () => {
             continue;
           }
 
-          // Parse the grouped columns (assuming groups of 3: Qty, Price, Total)
-          // Adjust indices based on your actual structure
           const inventoryQty = parseFloat(row[2]) || 0;
           const inventoryPrice = parseFloat(row[3]) || 0;
           const inventoryTotal = parseFloat(row[4]) || (inventoryQty * inventoryPrice);
@@ -401,17 +387,14 @@ const InventoryTable = () => {
           const balancesPrice = parseFloat(row[12]) || 0;
           const balancesTotal = parseFloat(row[13]) || (balancesQty * balancesPrice);
 
-          // Determine final stock and unit price
           let stock = balancesQty;
           let unitPrice = balancesPrice;
 
-          // If balances are empty, use inventory values
           if (stock === 0 && inventoryQty > 0) {
             stock = inventoryQty;
             unitPrice = inventoryPrice;
           }
 
-          // If still no price but we have total and qty, calculate
           if (unitPrice === 0 && stock > 0 && balancesTotal > 0) {
             unitPrice = balancesTotal / stock;
           }
@@ -419,10 +402,9 @@ const InventoryTable = () => {
           const item = {
             name: name,
             unit: unit,
-            category: "Office Supplies", // Default category, can be customized
+            category: "Office Supplies",
             stock: stock,
             unitPrice: unitPrice,
-            // Store additional data for reference
             inventoryDec31: {
               qty: inventoryQty,
               unitPrice: inventoryPrice,
@@ -447,7 +429,6 @@ const InventoryTable = () => {
 
           parsedData.push(item);
 
-          // Add to preview (first 5 items)
           if (previewData.length < 5) {
             previewData.push({
               name: item.name,
@@ -471,10 +452,9 @@ const InventoryTable = () => {
 
       } catch (error) {
         console.error("Excel parse error:", error);
-        setError("Failed to parse Excel file. Error: " + error.message);
+        setError("Failed to parse Excel file.");
       } finally {
         setUploadLoading(false);
-        // Clear the file input
         e.target.value = '';
       }
     };
@@ -504,9 +484,7 @@ const InventoryTable = () => {
 
       let successCount = 0;
       let failCount = 0;
-      const errors = [];
 
-      // Process items in batches to avoid overwhelming the server
       const batchSize = 10;
       for (let i = 0; i < uploadData.length; i += batchSize) {
         const batch = uploadData.slice(i, i + batchSize);
@@ -525,15 +503,12 @@ const InventoryTable = () => {
               successCount++;
               return { success: true };
             } else {
-              const errorData = await response.json().catch(() => ({}));
               failCount++;
-              errors.push(`${item.name}: ${errorData.message || 'Failed to upload'}`);
-              return { success: false, error: errorData };
+              return { success: false };
             }
           } catch (error) {
             failCount++;
-            errors.push(`${item.name}: ${error.message}`);
-            return { success: false, error: error.message };
+            return { success: false };
           }
         });
 
@@ -547,12 +522,6 @@ const InventoryTable = () => {
 
       if (successCount > 0) {
         setSuccess(`Successfully uploaded ${successCount} item(s). ${failCount > 0 ? `Failed: ${failCount}` : ''}`);
-      }
-      if (failCount > 0 && errors.length > 0) {
-        console.error("Upload errors:", errors);
-        if (successCount === 0) {
-          setError(`Failed to upload items. ${errors[0]}`);
-        }
       }
 
     } catch (error) {
@@ -580,47 +549,12 @@ const InventoryTable = () => {
         'Balances Qty': 120,
         'Balances Unit Price': 254.17,
         'Balances Total': 30500.00
-      },
-      {
-        'Name': 'Ballpen',
-        'Unit': 'box',
-        'Inventory Qty': 50,
-        'Inventory Unit Price': 120.00,
-        'Inventory Total': 6000.00,
-        'Additions Qty': 20,
-        'Additions Unit Price': 125.00,
-        'Additions Total': 2500.00,
-        'Issuances Qty': 15,
-        'Issuances Unit Price': 120.00,
-        'Issuances Total': 1800.00,
-        'Balances Qty': 55,
-        'Balances Unit Price': 121.82,
-        'Balances Total': 6700.00
       }
     ];
 
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inventory Template');
-
-    // Adjust column widths
-    ws['!cols'] = [
-      { wch: 20 }, // Name
-      { wch: 10 }, // Unit
-      { wch: 15 }, // Inventory Qty
-      { wch: 18 }, // Inventory Unit Price
-      { wch: 15 }, // Inventory Total
-      { wch: 15 }, // Additions Qty
-      { wch: 18 }, // Additions Unit Price
-      { wch: 15 }, // Additions Total
-      { wch: 15 }, // Issuances Qty
-      { wch: 18 }, // Issuances Unit Price
-      { wch: 15 }, // Issuances Total
-      { wch: 15 }, // Balances Qty
-      { wch: 18 }, // Balances Unit Price
-      { wch: 15 }  // Balances Total
-    ];
-
     XLSX.writeFile(wb, 'inventory_import_template.xlsx');
   };
 
@@ -815,7 +749,7 @@ const InventoryTable = () => {
                 </div>
                 <div className="upload-warning">
                   <p className="warning-text">
-                    ⚠️ Note: Items with the same name may create duplicates. Please review before confirming.
+                    Note: Items with the same name may create duplicates. Please review before confirming.
                   </p>
                 </div>
               </div>
@@ -836,15 +770,14 @@ const InventoryTable = () => {
         {/* Success Message */}
         {success && (
           <div className="alert-success">
-            <span className="success-icon">✓</span>
             <span>{success}</span>
+            <button className="alert-close" onClick={() => setSuccess("")}>×</button>
           </div>
         )}
 
         {/* Error Message */}
         {error && (
           <div className="alert-error">
-            <span className="error-icon">✗</span>
             <span>{error}</span>
             <button className="alert-close" onClick={() => setError("")}>×</button>
           </div>
@@ -991,28 +924,24 @@ const InventoryTable = () => {
         {/* Summary Cards */}
         <div className="summary-grid">
           <div className="summary-card">
-            <div className="summary-icon">📦</div>
             <div>
               <p className="summary-label">Total Items</p>
               <p className="summary-value">{inventory.length}</p>
             </div>
           </div>
           <div className="summary-card">
-            <div className="summary-icon">💰</div>
             <div>
               <p className="summary-label">Total Value</p>
               <p className="summary-value">{formatCurrency(calculateTotalValue())}</p>
             </div>
           </div>
           <div className="summary-card summary-warning">
-            <div className="summary-icon">⚠️</div>
             <div>
               <p className="summary-label">Low Stock Items</p>
               <p className="summary-value">{calculateLowStockCount()}</p>
             </div>
           </div>
           <div className="summary-card summary-danger">
-            <div className="summary-icon">❌</div>
             <div>
               <p className="summary-label">Out of Stock</p>
               <p className="summary-value">{calculateOutOfStockCount()}</p>

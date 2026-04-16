@@ -12,6 +12,7 @@ const MyRequests = () => {
         category: "",
         unitPrice: 0,
         totalPrice: 0,
+        stock: 0,
         errors: {}
     }]);
     const [submitting, setSubmitting] = useState(false);
@@ -25,10 +26,37 @@ const MyRequests = () => {
 
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const inputRefs = useRef({});
+    const dropdownRef = useRef(null);
 
     useEffect(() => {
         fetchInventoryItems();
     }, []);
+
+    // Update position on scroll and resize
+    useEffect(() => {
+        if (showSuggestions !== null) {
+            const updatePosition = () => {
+                if (inputRefs.current[showSuggestions]) {
+                    const rect = inputRefs.current[showSuggestions].getBoundingClientRect();
+                    setSuggestionPosition({
+                        top: rect.bottom + window.scrollY,
+                        left: rect.left + window.scrollX,
+                        width: rect.width
+                    });
+                }
+            };
+
+            updatePosition();
+
+            window.addEventListener('scroll', updatePosition, true);
+            window.addEventListener('resize', updatePosition);
+
+            return () => {
+                window.removeEventListener('scroll', updatePosition, true);
+                window.removeEventListener('resize', updatePosition);
+            };
+        }
+    }, [showSuggestions]);
 
     const fetchInventoryItems = async () => {
         setLoadingInventory(true);
@@ -65,6 +93,23 @@ const MyRequests = () => {
         }
     };
 
+    const checkStockAvailability = (itemName, requestedQuantity) => {
+        const inventoryItem = inventoryItems.find(
+            item => (item.name || item.itemName || "").toLowerCase() === itemName.toLowerCase()
+        );
+
+        if (inventoryItem) {
+            const availableStock = inventoryItem.stock || inventoryItem.balances?.qty || 0;
+            return {
+                available: availableStock,
+                isAvailable: availableStock > 0,
+                hasEnoughStock: requestedQuantity <= availableStock,
+                item: inventoryItem
+            };
+        }
+        return { available: 0, isAvailable: false, hasEnoughStock: false, item: null };
+    };
+
     const handleItemChange = (index, field, value) => {
         const updated = [...items];
 
@@ -77,10 +122,24 @@ const MyRequests = () => {
                 setShowSuggestions(null);
             }
             setActiveSuggestionIndex(null);
+
+            updated[index].stock = 0;
+            updated[index].errors.stockError = null;
         } else if (field === "quantity") {
             const quantity = Number(value) || 0;
             updated[index].quantity = quantity;
             updated[index].totalPrice = quantity * (updated[index].unitPrice || 0);
+
+            if (updated[index].itemName && quantity > 0) {
+                const stockCheck = checkStockAvailability(updated[index].itemName, quantity);
+                if (!stockCheck.hasEnoughStock && stockCheck.available > 0) {
+                    updated[index].errors.quantity = `Only ${stockCheck.available} item(s) available in stock`;
+                } else if (stockCheck.available === 0) {
+                    updated[index].errors.quantity = `Item is out of stock`;
+                } else if (updated[index].errors.quantity && !updated[index].errors.quantity.includes("Only")) {
+                    updated[index].errors.quantity = null;
+                }
+            }
         } else {
             updated[index][field] = value;
         }
@@ -92,12 +151,27 @@ const MyRequests = () => {
     const handleSelectSuggestion = (index, suggestion) => {
         const updated = [...items];
         const quantity = Number(updated[index].quantity) || 0;
+        const availableStock = suggestion.stock || suggestion.balances?.qty || 0;
+        const isOutOfStock = availableStock === 0;
 
         updated[index].itemName = suggestion.name || suggestion.itemName;
         updated[index].unit = suggestion.unit || "";
         updated[index].category = suggestion.category || "";
         updated[index].unitPrice = suggestion.unitPrice || suggestion.price || 0;
+        updated[index].stock = availableStock;
         updated[index].totalPrice = quantity * (suggestion.unitPrice || suggestion.price || 0);
+
+        if (isOutOfStock) {
+            updated[index].errors.stockError = "This item is currently out of stock";
+            updated[index].errors.quantity = "Cannot request out of stock item";
+            setErrorMessage(`"${updated[index].itemName}" is out of stock and cannot be requested`);
+            setTimeout(() => setErrorMessage(""), 5000);
+        } else if (quantity > availableStock) {
+            updated[index].errors.quantity = `Only ${availableStock} item(s) available in stock`;
+        } else {
+            updated[index].errors.stockError = null;
+            updated[index].errors.quantity = null;
+        }
 
         setItems(updated);
         setShowSuggestions(null);
@@ -110,27 +184,51 @@ const MyRequests = () => {
         const quantity = Number(value) || 0;
         updated[index].quantity = quantity;
         updated[index].totalPrice = quantity * (updated[index].unitPrice || 0);
+
+        if (updated[index].itemName && quantity > 0) {
+            const stockCheck = checkStockAvailability(updated[index].itemName, quantity);
+            if (!stockCheck.hasEnoughStock && stockCheck.available > 0) {
+                updated[index].errors.quantity = `Only ${stockCheck.available} item(s) available in stock`;
+            } else if (stockCheck.available === 0) {
+                updated[index].errors.quantity = `Item is out of stock`;
+            } else {
+                updated[index].errors.quantity = null;
+            }
+        }
+
         setItems(updated);
         validateItem(updated[index], index);
     };
 
     const validateItem = (item, index) => {
-        const errors = {};
+        const errors = { ...item.errors };
+
         if (!item.itemName || !item.itemName.trim()) {
             errors.itemName = "Item name is required";
+        } else {
+            delete errors.itemName;
         }
+
         if (!item.quantity || item.quantity <= 0) {
             errors.quantity = "Quantity must be greater than 0";
         }
+
         if (!item.unit) {
             errors.unit = "Unit is required";
+        } else {
+            delete errors.unit;
+        }
+
+        if (item.itemName && item.stock === 0) {
+            errors.stockError = "This item is out of stock";
+            errors.quantity = "Cannot request out of stock item";
         }
 
         setItems(prev => prev.map((i, idx) =>
             idx === index ? { ...i, errors } : i
         ));
 
-        return Object.keys(errors).length === 0;
+        return Object.keys(errors).filter(key => key !== 'stockError').length === 0;
     };
 
     const addItem = () => {
@@ -143,6 +241,7 @@ const MyRequests = () => {
             category: "",
             unitPrice: 0,
             totalPrice: 0,
+            stock: 0,
             errors: {}
         }]);
     };
@@ -171,6 +270,26 @@ const MyRequests = () => {
         }).format(amount || 0);
     };
 
+    const validateAllItemsStock = () => {
+        let hasOutOfStockItems = false;
+        let stockErrors = [];
+
+        items.forEach((item, index) => {
+            if (item.itemName) {
+                const stockCheck = checkStockAvailability(item.itemName, Number(item.quantity) || 0);
+                if (stockCheck.available === 0) {
+                    hasOutOfStockItems = true;
+                    stockErrors.push(`"${item.itemName}" is out of stock`);
+                } else if (!stockCheck.hasEnoughStock && stockCheck.available > 0) {
+                    hasOutOfStockItems = true;
+                    stockErrors.push(`"${item.itemName}" only has ${stockCheck.available} item(s) available`);
+                }
+            }
+        });
+
+        return { hasOutOfStockItems, stockErrors };
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -180,6 +299,14 @@ const MyRequests = () => {
                 isValid = false;
             }
         });
+
+        const { hasOutOfStockItems, stockErrors } = validateAllItemsStock();
+
+        if (hasOutOfStockItems) {
+            setErrorMessage(`Cannot submit requisition: ${stockErrors.join(", ")}`);
+            setTimeout(() => setErrorMessage(""), 8000);
+            return;
+        }
 
         if (!isValid) {
             setErrorMessage("Please fix the errors before submitting");
@@ -222,6 +349,7 @@ const MyRequests = () => {
                 category: "",
                 unitPrice: 0,
                 totalPrice: 0,
+                stock: 0,
                 errors: {}
             }]);
             setNotes("");
@@ -247,6 +375,7 @@ const MyRequests = () => {
                 category: "",
                 unitPrice: 0,
                 totalPrice: 0,
+                stock: 0,
                 errors: {}
             }]);
             setNotes("");
@@ -340,12 +469,16 @@ const MyRequests = () => {
                                         <th>Unit <span className="required">*</span></th>
                                         <th>Unit Price</th>
                                         <th>Total</th>
+                                        <th>Stock Status</th>
                                         <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.map((item, index) => {
                                         const suggestions = getFilteredSuggestions(item.itemName);
+                                        const isOutOfStock = item.stock === 0 && item.itemName;
+                                        const isLowStock = item.stock > 0 && item.stock <= 5;
+
                                         return (
                                             <tr key={item.id}>
                                                 <td>
@@ -375,6 +508,7 @@ const MyRequests = () => {
                                                         onChange={(e) => handleQuantityChange(index, e.target.value)}
                                                         className={item.errors.quantity ? 'error' : ''}
                                                         placeholder="0"
+                                                        disabled={isOutOfStock}
                                                     />
                                                     {item.errors.quantity && (
                                                         <span className="error-text">{item.errors.quantity}</span>
@@ -385,6 +519,7 @@ const MyRequests = () => {
                                                         value={item.unit}
                                                         onChange={(e) => handleItemChange(index, "unit", e.target.value)}
                                                         className={item.errors.unit ? 'error' : ''}
+                                                        disabled={isOutOfStock}
                                                     >
                                                         <option value="">Select</option>
                                                         <option value="piece">Piece</option>
@@ -404,6 +539,19 @@ const MyRequests = () => {
                                                 </td>
                                                 <td className="total-cell">
                                                     {formatCurrency(item.totalPrice)}
+                                                </td>
+                                                <td className="stock-status-cell">
+                                                    {item.itemName && (
+                                                        <div className={`stock-status ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}`}>
+                                                            {isOutOfStock ? (
+                                                                <span className="status-text out">Out of Stock</span>
+                                                            ) : isLowStock ? (
+                                                                <span className="status-text low">Low Stock ({item.stock} left)</span>
+                                                            ) : item.stock > 0 ? (
+                                                                <span className="status-text in">In Stock ({item.stock})</span>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td>
                                                     {items.length > 1 && (
@@ -481,16 +629,18 @@ const MyRequests = () => {
                     <div className="help">
                         <p>Fields marked with * are required.</p>
                         <p>Your request will be reviewed before processing.</p>
+                        <p className="stock-note">Note: Items marked as "Out of Stock" cannot be requested.</p>
                     </div>
                 </form>
             </div>
 
-            {/* Global Suggestions Dropdown - Overlays the page */}
+            {/* Global Suggestions Dropdown - Follows the input field on scroll */}
             {showSuggestions !== null && getFilteredSuggestions(items[showSuggestions]?.itemName).length > 0 && (
                 <div
+                    ref={dropdownRef}
                     className="suggestions-dropdown-overlay"
                     style={{
-                        position: 'fixed',
+                        position: 'absolute',
                         top: suggestionPosition.top,
                         left: suggestionPosition.left,
                         width: suggestionPosition.width,
@@ -504,9 +654,7 @@ const MyRequests = () => {
                                 className={activeSuggestionIndex === idx ? 'active' : ''}
                                 onClick={() => handleSelectSuggestion(showSuggestions, suggestion)}
                             >
-                                <span className="suggestion-name">{suggestion.name || suggestion.itemName}</span>
-                                <span className="suggestion-unit">{suggestion.unit}</span>
-                                <span className="suggestion-price">{formatCurrency(suggestion.unitPrice || suggestion.price)}</span>
+                                {suggestion.name || suggestion.itemName}
                             </li>
                         ))}
                     </ul>

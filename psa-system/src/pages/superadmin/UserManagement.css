@@ -345,11 +345,6 @@
     color: white;
 }
 
-.badge-approver {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: white;
-}
-
 .badge-employee {
     background: linear-gradient(135deg, #6b7280, #4b5563);
     color: white;

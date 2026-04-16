@@ -342,7 +342,7 @@ const RequestApproval = () => {
                                 onClick={() => { setFilterStatus(status); setCurrentPage(1); }}
                                 className={`filter-tab ${filterStatus === status ? 'active' : ''}`}
                             >
-                                {status === 'all' ? 'All Requests' : status.charAt(0).toUpperCase() + status.slice(1)}
+                                {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
                                 {status !== 'all' && (
                                     <span className="filter-count">({stats[status] || 0})</span>
                                 )}

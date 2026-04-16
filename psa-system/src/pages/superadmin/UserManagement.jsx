@@ -32,7 +32,6 @@ const UserManagement = () => {
     const roleOptions = [
         { value: 'superadmin', label: 'Super Admin' },
         { value: 'admin', label: 'Admin' },
-        { value: 'approver', label: 'Approver' },
         { value: 'employee', label: 'Employee' }
     ];
 
@@ -308,7 +307,6 @@ const UserManagement = () => {
         const roleMap = {
             superadmin: { label: 'Super Admin', class: 'badge-superadmin' },
             admin: { label: 'Admin', class: 'badge-admin' },
-            approver: { label: 'Approver', class: 'badge-approver' },
             employee: { label: 'Employee', class: 'badge-employee' }
         };
         const config = roleMap[role] || { label: role, class: 'badge-default' };
