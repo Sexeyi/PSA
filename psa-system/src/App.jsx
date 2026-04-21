@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './Components/Sidebar';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
@@ -119,7 +119,7 @@ function App() {
     return !!(token && user);
   });
 
-  // User state
+  // User state - load from localStorage
   const [user, setUser] = useState(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
@@ -158,19 +158,29 @@ function App() {
     }
   }, [menuItems, currentView]);
 
-  const handleLogin = (userData, token) => {
+  // Handle login
+  const handleLogin = useCallback((userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setIsLoggedIn(true);
     setUser(userData);
     setCurrentView('Dashboard');
-  };
+  }, []);
 
-  const toggleSidebar = () => {
-    setSidebarExpanded(!sidebarExpanded);
-  };
+  // Handle user update (for profile picture changes)
+  const handleUserUpdate = useCallback((updatedUser) => {
+    console.log('Updating user in App:', updatedUser);
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  }, []);
 
-  const handleLogout = () => {
+  // Toggle sidebar
+  const toggleSidebar = useCallback(() => {
+    setSidebarExpanded(prev => !prev);
+  }, []);
+
+  // Handle logout
+  const handleLogout = useCallback(() => {
     localStorage.clear();
     setIsLoggedIn(false);
     setUser(null);
@@ -178,7 +188,7 @@ function App() {
     setSupplies([]);
     setUsers([]);
     setRequisitions([]);
-  };
+  }, []);
 
   return (
     <Router>
@@ -199,7 +209,7 @@ function App() {
                 setCurrentView={setCurrentView}
                 user={user}
                 menuItems={menuItems}
-                setUser={setUser}
+                setUser={handleUserUpdate}
               />
             ) : (
               <Navigate to="/login" replace />

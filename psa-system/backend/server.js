@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path'); // Add this line
 require('dotenv').config();
 const User = require('./models/User');
 const mongoose = require('mongoose');
@@ -20,6 +21,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+
+// Serve static files from uploads directory - ADD THIS LINE
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 2️⃣ Request logging middleware
 app.use((req, res, next) => {
@@ -55,7 +59,8 @@ if (process.env.NODE_ENV === 'development') {
                     role: u.role,
                     status: u.status,
                     fullName: u.fullName,
-                    department: u.department
+                    department: u.department,
+                    profilePicture: u.profilePicture // Add this to debug
                 }))
             });
         } catch (error) {

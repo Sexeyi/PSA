@@ -5,21 +5,41 @@ const PDFDocument = require("pdfkit");
 // ------------------------- CREATE REQUISITION -------------------------
 exports.createRequisition = async (req, res) => {
     try {
+        const { items, notes, overallTotal } = req.body;
+
+        // Process items to ensure prices are properly formatted
+        const processedItems = items.map(item => ({
+            itemName: item.itemName,
+            quantity: Number(item.quantity) || 0,
+            unit: item.unit || "",
+            category: item.category || "",
+            unitPrice: Number(item.unitPrice) || 0,
+            totalPrice: Number(item.totalPrice) || 0,
+            itemId: item.itemId || null
+        }));
+
         const requisition = await Requisition.create({
             requesterId: req.user._id,
             requesterName: req.user.fullName,
             department: req.user.department,
-            items: req.body.items,
-            notes: req.body.notes
+            items: processedItems,
+            notes: notes || "",
+            overallTotal: Number(overallTotal) || 0,
+            status: "pending",
+            dateRequested: new Date()
         });
 
         res.status(201).json({
+            success: true,
             message: "Requisition submitted successfully",
-            requisition
+            data: requisition
         });
     } catch (error) {
         console.error("Error creating requisition:", error);
-        res.status(500).json({ message: error.message });
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
 };
 
@@ -31,25 +51,44 @@ exports.getAllRequisitions = async (req, res, next) => {
 
         if (status && status !== "all") {
             const statusMap = {
-                'pending': 'Pending',
-                'approved': 'Approved',
-                'rejected': 'Rejected',
-                'issued': 'Issued'
+                'pending': 'pending',
+                'approved': 'approved',
+                'rejected': 'rejected',
+                'issued': 'issued'
             };
 
-            const formattedStatus = statusMap[status.toLowerCase()] ||
-                (status.charAt(0).toUpperCase() + status.slice(1).toLowerCase());
+            const formattedStatus = statusMap[status.toLowerCase()] || status;
             query.status = formattedStatus;
         }
 
         const requisitions = await Requisition.find(query)
-            .populate('requesterId', 'fullName email department')
+            .populate('requesterId', 'fullName email department employeeId')
             .sort({ dateRequested: -1 });
+
+        // Calculate totals for each requisition if not already present
+        const requisitionsWithTotals = requisitions.map(req => {
+            const reqObj = req.toObject();
+
+            // Calculate totals if overallTotal is missing
+            if (!reqObj.overallTotal || reqObj.overallTotal === 0) {
+                reqObj.overallTotal = reqObj.items.reduce((sum, item) => {
+                    return sum + (Number(item.totalPrice) || Number(item.quantity) * Number(item.unitPrice) || 0);
+                }, 0);
+            }
+
+            // Ensure each item has totalPrice
+            reqObj.items = reqObj.items.map(item => ({
+                ...item,
+                totalPrice: item.totalPrice || (Number(item.quantity) * Number(item.unitPrice)) || 0
+            }));
+
+            return reqObj;
+        });
 
         res.json({
             success: true,
-            count: requisitions.length,
-            data: requisitions
+            count: requisitionsWithTotals.length,
+            data: requisitionsWithTotals
         });
     } catch (error) {
         console.error("Error in getAllRequisitions:", error);
@@ -73,9 +112,24 @@ exports.getRequisitionById = async (req, res) => {
             });
         }
 
+        const reqObj = requisition.toObject();
+
+        // Calculate overall total if missing
+        if (!reqObj.overallTotal || reqObj.overallTotal === 0) {
+            reqObj.overallTotal = reqObj.items.reduce((sum, item) => {
+                return sum + (Number(item.totalPrice) || Number(item.quantity) * Number(item.unitPrice) || 0);
+            }, 0);
+        }
+
+        // Ensure each item has totalPrice
+        reqObj.items = reqObj.items.map(item => ({
+            ...item,
+            totalPrice: item.totalPrice || (Number(item.quantity) * Number(item.unitPrice)) || 0
+        }));
+
         res.json({
             success: true,
-            data: requisition
+            data: reqObj
         });
     } catch (error) {
         console.error("Error fetching requisition:", error);
@@ -92,9 +146,26 @@ exports.getMyRequisitions = async (req, res) => {
         const requisitions = await Requisition.find({ requesterId: req.user._id })
             .sort({ dateRequested: -1 });
 
+        const requisitionsWithTotals = requisitions.map(req => {
+            const reqObj = req.toObject();
+
+            if (!reqObj.overallTotal || reqObj.overallTotal === 0) {
+                reqObj.overallTotal = reqObj.items.reduce((sum, item) => {
+                    return sum + (Number(item.totalPrice) || Number(item.quantity) * Number(item.unitPrice) || 0);
+                }, 0);
+            }
+
+            reqObj.items = reqObj.items.map(item => ({
+                ...item,
+                totalPrice: item.totalPrice || (Number(item.quantity) * Number(item.unitPrice)) || 0
+            }));
+
+            return reqObj;
+        });
+
         res.json({
             success: true,
-            data: requisitions
+            data: requisitionsWithTotals
         });
     } catch (error) {
         res.status(500).json({
@@ -190,10 +261,16 @@ exports.approveRequisition = async (req, res) => {
 
         await requisition.save();
 
+        // Return the requisition with calculated totals
+        const reqObj = requisition.toObject();
+        reqObj.overallTotal = reqObj.items.reduce((sum, item) => {
+            return sum + (Number(item.totalPrice) || Number(item.quantity) * Number(item.unitPrice) || 0);
+        }, 0);
+
         res.json({
             success: true,
             message: `Requisition ${requisition.status.toLowerCase()} successfully`,
-            data: requisition
+            data: reqObj
         });
 
     } catch (error) {
@@ -278,7 +355,9 @@ exports.issueRequisition = async (req, res) => {
 
             issuedItems.push({
                 name: inventoryItem.name,
-                quantity: item.quantity
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                totalPrice: item.quantity * item.unitPrice
             });
         }
 
@@ -311,11 +390,17 @@ exports.issueRequisition = async (req, res) => {
             message = `Requisition issued but ${missingItems.length} item(s) were not found in inventory`;
         }
 
+        // Calculate totals for response
+        const reqObj = requisition.toObject();
+        reqObj.overallTotal = reqObj.items.reduce((sum, item) => {
+            return sum + (Number(item.totalPrice) || Number(item.quantity) * Number(item.unitPrice) || 0);
+        }, 0);
+
         res.json({
             success: true,
             warning: warning,
             message: message,
-            data: requisition,
+            data: reqObj,
             issuedItems: issuedItems,
             missingItems: missingItems.length > 0 ? missingItems : undefined
         });
@@ -397,9 +482,18 @@ exports.updateRequisition = async (req, res) => {
             });
         }
 
-        const { items, notes } = req.body;
-        if (items) requisition.items = items;
+        const { items, notes, overallTotal } = req.body;
+
+        if (items) {
+            requisition.items = items.map(item => ({
+                ...item,
+                unitPrice: Number(item.unitPrice) || 0,
+                totalPrice: Number(item.totalPrice) || (Number(item.quantity) * Number(item.unitPrice)) || 0
+            }));
+        }
+
         if (notes !== undefined) requisition.notes = notes;
+        if (overallTotal !== undefined) requisition.overallTotal = Number(overallTotal) || 0;
 
         await requisition.save();
 
@@ -475,6 +569,11 @@ exports.generatePDF = async (req, res) => {
         );
         doc.pipe(res);
 
+        // Calculate total value for PDF
+        const totalValue = requisition.items.reduce((sum, item) => {
+            return sum + (Number(item.totalPrice) || Number(item.quantity) * Number(item.unitPrice) || 0);
+        }, 0);
+
         let y = 50;
         const margin = 50;
         const pageWidth = doc.page.width - 100;
@@ -502,6 +601,11 @@ exports.generatePDF = async (req, res) => {
         doc.font("Helvetica-Bold")
             .text("General Fund", margin + 490, y);
 
+        y += 20;
+
+        // Add Total Value to PDF
+        doc.font("Helvetica-Bold")
+            .text(`Total Amount: ₱${totalValue.toFixed(2)}`, margin + 350, y);
         y += 20;
 
         // Table setup
@@ -593,6 +697,8 @@ exports.generatePDF = async (req, res) => {
                         unit: item.unit || "pc",
                         description: item.itemName || item.description || "Item",
                         quantity: item.quantity || 1,
+                        unitPrice: item.unitPrice || 0,
+                        totalPrice: item.totalPrice || (item.quantity * item.unitPrice) || 0,
                         remarks: ""
                     });
                 }
@@ -649,7 +755,12 @@ exports.generatePDF = async (req, res) => {
             y += rowHeight;
         });
 
+        // Add total value summary
         y += 10;
+        doc.font("Helvetica-Bold").fontSize(10)
+            .text(`TOTAL VALUE: ₱${totalValue.toFixed(2)}`, margin + 350, y);
+        y += 20;
+
         const sigWidth = 140;
         x = margin;
 
@@ -778,15 +889,15 @@ exports.updateRequisitionStatus = async (req, res) => {
             });
         }
 
-        const validStatuses = ['Pending', 'Approved', 'Rejected', 'Issued'];
-        if (!validStatuses.includes(status)) {
+        const validStatuses = ['pending', 'approved', 'rejected', 'issued'];
+        if (!validStatuses.includes(status.toLowerCase())) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid status"
             });
         }
 
-        requisition.status = status;
+        requisition.status = status.toLowerCase();
         requisition.approverRemarks = remarks || requisition.approverRemarks;
         requisition.approvedDate = new Date();
         requisition.approvedBy = req.user.fullName;

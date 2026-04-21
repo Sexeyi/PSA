@@ -110,6 +110,8 @@ const Sidebar = ({
   onToggleCollapse,
   onLogout
 }) => {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   const handleMenuClick = (view) => {
     if (view === 'Logout') {
       if (onLogout) onLogout();
@@ -151,6 +153,19 @@ const Sidebar = ({
     // Default
     return <Circle {...iconProps} />;
   };
+
+  // Get profile picture URL
+  const getProfilePictureUrl = () => {
+    if (user?.profilePicture) {
+      const pictureUrl = user.profilePicture.startsWith('http')
+        ? user.profilePicture
+        : `${API_BASE_URL}${user.profilePicture}`;
+      return pictureUrl;
+    }
+    return null;
+  };
+
+  const profilePictureUrl = getProfilePictureUrl();
 
   return (
     <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -202,7 +217,19 @@ const Sidebar = ({
           {!collapsed ? (
             <div className="user-profile">
               <div className="user-avatar">
-                {user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0)}
+                {profilePictureUrl ? (
+                  <img
+                    src={profilePictureUrl}
+                    alt={user?.fullName || 'User'}
+                    className="user-avatar-image"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0);
+                    }}
+                  />
+                ) : (
+                  user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0)
+                )}
               </div>
               <div className="user-info">
                 <span className="user-name">{user?.fullName || 'User'}</span>
@@ -212,7 +239,19 @@ const Sidebar = ({
           ) : (
             <div className="user-profile-collapsed" title={user?.fullName || userRole}>
               <div className="user-avatar-small">
-                {user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0)}
+                {profilePictureUrl ? (
+                  <img
+                    src={profilePictureUrl}
+                    alt={user?.fullName || 'User'}
+                    className="user-avatar-image-small"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0);
+                    }}
+                  />
+                ) : (
+                  user?.fullName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || userRole.charAt(0)
+                )}
               </div>
             </div>
           )}

@@ -38,9 +38,32 @@ const Login = (props) => {
       console.log('3. Response data:', data);
 
       if (response.ok) {
+        // Get the user data from the response
+        let userData = data.user;
+
+        // If the user data doesn't have profilePicture, fetch the complete user data
+        if (!userData.profilePicture) {
+          console.log('Profile picture not in response, fetching complete user data...');
+          try {
+            const userResponse = await fetch(`http://localhost:5000/api/users/${userData._id}`, {
+              headers: {
+                'Authorization': `Bearer ${data.token}`
+              }
+            });
+
+            if (userResponse.ok) {
+              const completeUserData = await userResponse.json();
+              userData = completeUserData.data || completeUserData;
+              console.log('Fetched complete user data:', userData);
+            }
+          } catch (err) {
+            console.error('Error fetching complete user data:', err);
+          }
+        }
+
         // Save to localStorage
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('user', JSON.stringify(userData));
 
         // Handle remember me - if checked, we could set longer expiration
         if (rememberMe) {
@@ -50,14 +73,14 @@ const Login = (props) => {
 
         console.log('4. Login successful, data saved to localStorage');
         console.log('   - Token saved:', !!data.token);
-        console.log('   - User saved:', data.user);
-
+        console.log('   - User saved:', userData);
+        console.log('   - Profile picture:', userData.profilePicture);
 
         if (props.onLogin) {
-          props.onLogin(data.user, data.token);
+          props.onLogin(userData, data.token);
         }
 
-        //  Small delay to ensure storage is updated
+        // Small delay to ensure storage is updated
         setTimeout(() => {
           console.log('5. Redirecting to dashboard...');
           navigate('/dashboard', { replace: true });

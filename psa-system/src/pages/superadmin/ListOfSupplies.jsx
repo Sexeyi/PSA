@@ -261,7 +261,7 @@ const ListOfSupplies = () => {
           <ul>
             {categories.map(cat => (
               <li
-                key={cat}
+                key={cat}  // ← Add this line
                 className={selectedCategory === cat ? 'active' : ''}
                 onClick={() => setSelectedCategory(cat)}
               >

@@ -18,6 +18,14 @@ const ItemSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    unitPrice: {
+        type: Number,
+        default: 0
+    },
+    totalPrice: {
+        type: Number,
+        default: 0
+    },
     itemId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Inventory'
@@ -64,6 +72,10 @@ const RequisitionSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    overallTotal: {
+        type: Number,
+        default: 0
+    }
 });
 
 module.exports = mongoose.model('Requisition', RequisitionSchema);

@@ -65,21 +65,60 @@ const MyRequests = () => {
             const response = await axios.get(`${API_BASE_URL}/api/inventories`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const inventoryData = response.data.data || response.data || [];
+
+            // Handle different response structures
+            let inventoryData = [];
+            if (response.data.data && Array.isArray(response.data.data)) {
+                inventoryData = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                inventoryData = response.data;
+            } else if (response.data.inventories && Array.isArray(response.data.inventories)) {
+                inventoryData = response.data.inventories;
+            } else {
+                inventoryData = [];
+            }
+
+            console.log("Inventory data loaded:", inventoryData);
             setInventoryItems(inventoryData);
         } catch (error) {
             console.error("Error fetching inventory:", error);
+            setErrorMessage("Failed to load inventory items");
+            setTimeout(() => setErrorMessage(""), 5000);
         } finally {
             setLoadingInventory(false);
         }
+    };
+
+    // Helper function to get available stock from inventory item
+    const getAvailableStock = (inventoryItem) => {
+        return inventoryItem.stock ||
+            inventoryItem.balances?.qty ||
+            inventoryItem.quantity ||
+            0;
+    };
+
+    // Helper function to get unit price from inventory item
+    const getUnitPrice = (inventoryItem) => {
+        return inventoryItem.unitPrice ||
+            inventoryItem.price ||
+            inventoryItem.balances?.unitPrice ||
+            0;
     };
 
     const getFilteredSuggestions = (searchTerm) => {
         if (!searchTerm || searchTerm.trim() === "") return [];
         const term = searchTerm.toLowerCase().trim();
         return inventoryItems
-            .filter(item => (item.name || item.itemName || "").toLowerCase().includes(term))
-            .slice(0, 6);
+            .filter(item => {
+                const itemName = item.name || item.itemName || "";
+                return itemName.toLowerCase().includes(term);
+            })
+            .slice(0, 6)
+            .map(item => ({
+                ...item,
+                availableStock: getAvailableStock(item),
+                unitPrice: getUnitPrice(item)
+            }));
     };
 
     const updateSuggestionPosition = (index) => {
@@ -99,15 +138,16 @@ const MyRequests = () => {
         );
 
         if (inventoryItem) {
-            const availableStock = inventoryItem.stock || inventoryItem.balances?.qty || 0;
+            const availableStock = getAvailableStock(inventoryItem);
             return {
                 available: availableStock,
                 isAvailable: availableStock > 0,
                 hasEnoughStock: requestedQuantity <= availableStock,
-                item: inventoryItem
+                item: inventoryItem,
+                unitPrice: getUnitPrice(inventoryItem)
             };
         }
-        return { available: 0, isAvailable: false, hasEnoughStock: false, item: null };
+        return { available: 0, isAvailable: false, hasEnoughStock: false, item: null, unitPrice: 0 };
     };
 
     const handleItemChange = (index, field, value) => {
@@ -115,6 +155,12 @@ const MyRequests = () => {
 
         if (field === "itemName") {
             updated[index].itemName = value;
+
+            // Clear itemName error when user types
+            if (updated[index].errors?.itemName) {
+                delete updated[index].errors.itemName;
+            }
+
             if (value && value.trim() !== "") {
                 updateSuggestionPosition(index);
                 setShowSuggestions(index);
@@ -124,21 +170,41 @@ const MyRequests = () => {
             setActiveSuggestionIndex(null);
 
             updated[index].stock = 0;
-            updated[index].errors.stockError = null;
+            updated[index].unitPrice = 0;
+            updated[index].totalPrice = 0;
+            if (updated[index].errors) {
+                updated[index].errors.stockError = null;
+            }
         } else if (field === "quantity") {
             const quantity = Number(value) || 0;
+            const unitPrice = updated[index].unitPrice || 0;
             updated[index].quantity = quantity;
-            updated[index].totalPrice = quantity * (updated[index].unitPrice || 0);
+            updated[index].totalPrice = quantity * unitPrice;
+
+            // Clear quantity error
+            if (updated[index].errors?.quantity) {
+                delete updated[index].errors.quantity;
+            }
 
             if (updated[index].itemName && quantity > 0) {
                 const stockCheck = checkStockAvailability(updated[index].itemName, quantity);
                 if (!stockCheck.hasEnoughStock && stockCheck.available > 0) {
+                    if (!updated[index].errors) updated[index].errors = {};
                     updated[index].errors.quantity = `Only ${stockCheck.available} item(s) available in stock`;
                 } else if (stockCheck.available === 0) {
+                    if (!updated[index].errors) updated[index].errors = {};
                     updated[index].errors.quantity = `Item is out of stock`;
-                } else if (updated[index].errors.quantity && !updated[index].errors.quantity.includes("Only")) {
-                    updated[index].errors.quantity = null;
+                } else {
+                    if (updated[index].errors?.quantity) {
+                        delete updated[index].errors.quantity;
+                    }
                 }
+            }
+        } else if (field === "unit") {
+            updated[index].unit = value;
+            // Clear unit error when unit is selected
+            if (updated[index].errors?.unit) {
+                delete updated[index].errors.unit;
             }
         } else {
             updated[index][field] = value;
@@ -151,15 +217,22 @@ const MyRequests = () => {
     const handleSelectSuggestion = (index, suggestion) => {
         const updated = [...items];
         const quantity = Number(updated[index].quantity) || 0;
-        const availableStock = suggestion.stock || suggestion.balances?.qty || 0;
+        const availableStock = suggestion.availableStock || 0;
+        const unitPrice = suggestion.unitPrice || 0;
         const isOutOfStock = availableStock === 0;
+
+        // Calculate total price immediately
+        const totalPrice = quantity * unitPrice;
 
         updated[index].itemName = suggestion.name || suggestion.itemName;
         updated[index].unit = suggestion.unit || "";
         updated[index].category = suggestion.category || "";
-        updated[index].unitPrice = suggestion.unitPrice || suggestion.price || 0;
+        updated[index].unitPrice = unitPrice;
         updated[index].stock = availableStock;
-        updated[index].totalPrice = quantity * (suggestion.unitPrice || suggestion.price || 0);
+        updated[index].totalPrice = totalPrice;
+
+        // Initialize errors object if it doesn't exist
+        if (!updated[index].errors) updated[index].errors = {};
 
         if (isOutOfStock) {
             updated[index].errors.stockError = "This item is currently out of stock";
@@ -169,8 +242,8 @@ const MyRequests = () => {
         } else if (quantity > availableStock) {
             updated[index].errors.quantity = `Only ${availableStock} item(s) available in stock`;
         } else {
-            updated[index].errors.stockError = null;
-            updated[index].errors.quantity = null;
+            delete updated[index].errors.stockError;
+            delete updated[index].errors.quantity;
         }
 
         setItems(updated);
@@ -182,17 +255,29 @@ const MyRequests = () => {
     const handleQuantityChange = (index, value) => {
         const updated = [...items];
         const quantity = Number(value) || 0;
+        const unitPrice = updated[index].unitPrice || 0;
+
+        // Calculate total price when quantity changes
         updated[index].quantity = quantity;
-        updated[index].totalPrice = quantity * (updated[index].unitPrice || 0);
+        updated[index].totalPrice = quantity * unitPrice;
+
+        // Clear quantity error
+        if (updated[index].errors?.quantity) {
+            delete updated[index].errors.quantity;
+        }
 
         if (updated[index].itemName && quantity > 0) {
             const stockCheck = checkStockAvailability(updated[index].itemName, quantity);
             if (!stockCheck.hasEnoughStock && stockCheck.available > 0) {
+                if (!updated[index].errors) updated[index].errors = {};
                 updated[index].errors.quantity = `Only ${stockCheck.available} item(s) available in stock`;
             } else if (stockCheck.available === 0) {
+                if (!updated[index].errors) updated[index].errors = {};
                 updated[index].errors.quantity = `Item is out of stock`;
             } else {
-                updated[index].errors.quantity = null;
+                if (updated[index].errors?.quantity) {
+                    delete updated[index].errors.quantity;
+                }
             }
         }
 
@@ -201,34 +286,47 @@ const MyRequests = () => {
     };
 
     const validateItem = (item, index) => {
-        const errors = { ...item.errors };
+        const errors = { ...(item.errors || {}) };
 
+        // Validate item name
         if (!item.itemName || !item.itemName.trim()) {
             errors.itemName = "Item name is required";
         } else {
             delete errors.itemName;
         }
 
+        // Validate quantity
         if (!item.quantity || item.quantity <= 0) {
             errors.quantity = "Quantity must be greater than 0";
+        } else if (item.quantity > 0) {
+            // Only remove quantity error if it's not a stock-related error
+            if (errors.quantity && !errors.quantity.includes("Only") && !errors.quantity.includes("out of stock")) {
+                delete errors.quantity;
+            }
         }
 
+        // Validate unit
         if (!item.unit) {
             errors.unit = "Unit is required";
         } else {
             delete errors.unit;
         }
 
-        if (item.itemName && item.stock === 0) {
+        // Check stock status
+        if (item.itemName && item.stock === 0 && item.itemName.trim() !== "") {
             errors.stockError = "This item is out of stock";
-            errors.quantity = "Cannot request out of stock item";
+            if (!errors.quantity) {
+                errors.quantity = "Cannot request out of stock item";
+            }
         }
 
         setItems(prev => prev.map((i, idx) =>
             idx === index ? { ...i, errors } : i
         ));
 
-        return Object.keys(errors).filter(key => key !== 'stockError').length === 0;
+        // Return true if no errors (excluding stockError which is informational)
+        const criticalErrors = Object.keys(errors).filter(key => key !== 'stockError');
+        return criticalErrors.length === 0;
     };
 
     const addItem = () => {
@@ -274,8 +372,8 @@ const MyRequests = () => {
         let hasOutOfStockItems = false;
         let stockErrors = [];
 
-        items.forEach((item, index) => {
-            if (item.itemName) {
+        items.forEach((item) => {
+            if (item.itemName && item.itemName.trim() !== "") {
                 const stockCheck = checkStockAvailability(item.itemName, Number(item.quantity) || 0);
                 if (stockCheck.available === 0) {
                     hasOutOfStockItems = true;
@@ -294,11 +392,40 @@ const MyRequests = () => {
         e.preventDefault();
 
         let isValid = true;
+
+        // Validate all items
         items.forEach((item, index) => {
-            if (!validateItem(item, index)) {
+            const itemIsValid = validateItem(item, index);
+            if (!itemIsValid) {
                 isValid = false;
             }
         });
+
+        // Check if any item has errors
+        const hasErrors = items.some(item => {
+            if (!item.errors) return false;
+            const criticalErrors = Object.keys(item.errors).filter(key => key !== 'stockError');
+            return criticalErrors.length > 0;
+        });
+
+        if (hasErrors) {
+            setErrorMessage("Please fix all errors before submitting");
+            setTimeout(() => setErrorMessage(""), 5000);
+            return;
+        }
+
+        // Check if at least one item is filled
+        const hasAnyItem = items.some(item =>
+            item.itemName && item.itemName.trim() !== "" &&
+            item.quantity && item.quantity > 0 &&
+            item.unit
+        );
+
+        if (!hasAnyItem) {
+            setErrorMessage("Please add at least one valid item to your requisition");
+            setTimeout(() => setErrorMessage(""), 5000);
+            return;
+        }
 
         const { hasOutOfStockItems, stockErrors } = validateAllItemsStock();
 
@@ -320,27 +447,43 @@ const MyRequests = () => {
 
         try {
             const token = localStorage.getItem("token");
+            const userData = JSON.parse(localStorage.getItem("user"));
+
+            // Calculate overall total
+            const overallTotal = calculateOverallTotal();
+
+            // Prepare items with all necessary fields including prices
+            const preparedItems = items.map(item => ({
+                itemName: item.itemName,
+                quantity: Number(item.quantity),
+                unit: item.unit,
+                category: item.category,
+                unitPrice: Number(item.unitPrice) || 0,
+                totalPrice: Number(item.totalPrice) || 0
+            }));
+
             const payload = {
-                items: items.map(item => ({
-                    itemName: item.itemName,
-                    quantity: Number(item.quantity),
-                    unit: item.unit,
-                    category: item.category,
-                    unitPrice: item.unitPrice,
-                    totalPrice: item.totalPrice
-                })),
-                notes,
-                overallTotal: calculateOverallTotal()
+                requesterId: userData._id,
+                requesterName: userData.fullName || userData.name,
+                department: userData.department || "N/A",
+                items: preparedItems,
+                notes: notes,
+                overallTotal: overallTotal
             };
 
-            await axios.post(
+            console.log("Submitting payload:", JSON.stringify(payload, null, 2));
+
+            const response = await axios.post(
                 `${API_BASE_URL}/api/requisitions`,
                 payload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            setSuccessMessage("Requisition submitted successfully");
+            console.log("Response:", response.data);
 
+            setSuccessMessage("Requisition submitted successfully!");
+
+            // Reset form
             setItems([{
                 id: 1,
                 itemName: "",
@@ -353,12 +496,14 @@ const MyRequests = () => {
                 errors: {}
             }]);
             setNotes("");
+            setShowSuggestions(null);
 
+            // Clear success message after 5 seconds
             setTimeout(() => setSuccessMessage(""), 5000);
 
         } catch (error) {
-            console.error(error);
-            setErrorMessage(error.response?.data?.message || "Error submitting requisition");
+            console.error("Error details:", error.response?.data || error);
+            setErrorMessage(error.response?.data?.message || "Error submitting requisition. Please try again.");
             setTimeout(() => setErrorMessage(""), 5000);
         } finally {
             setSubmitting(false);
@@ -380,6 +525,8 @@ const MyRequests = () => {
             }]);
             setNotes("");
             setShowSuggestions(null);
+            setErrorMessage("");
+            setSuccessMessage("");
         }
     };
 
@@ -426,7 +573,7 @@ const MyRequests = () => {
         return (
             <div className="loading-container">
                 <div className="loading-spinner"></div>
-                <p>Loading inventory...</p>
+                <p>Loading inventory items...</p>
             </div>
         );
     }
@@ -443,12 +590,14 @@ const MyRequests = () => {
                 {/* Messages */}
                 {successMessage && (
                     <div className="alert alert-success">
+                        <span className="alert-icon">✓</span>
                         {successMessage}
                     </div>
                 )}
 
                 {errorMessage && (
                     <div className="alert alert-error">
+                        <span className="alert-icon">⚠️</span>
                         {errorMessage}
                     </div>
                 )}
@@ -458,25 +607,26 @@ const MyRequests = () => {
                     <div className="section">
                         <div className="section-header">
                             <h3>Request Items</h3>
+                            <p>Add the items you need to request</p>
                         </div>
 
                         <div className="table-wrapper">
                             <table className="items-table">
                                 <thead>
                                     <tr>
-                                        <th>Item Name <span className="required">*</span></th>
-                                        <th>Quantity <span className="required">*</span></th>
-                                        <th>Unit <span className="required">*</span></th>
-                                        <th>Unit Price</th>
-                                        <th>Total</th>
-                                        <th>Stock Status</th>
-                                        <th></th>
+                                        <th style={{ width: '30%' }}>Item Name <span className="required">*</span></th>
+                                        <th style={{ width: '15%' }}>Quantity <span className="required">*</span></th>
+                                        <th style={{ width: '15%' }}>Unit <span className="required">*</span></th>
+                                        <th style={{ width: '15%' }}>Unit Price</th>
+                                        <th style={{ width: '15%' }}>Total</th>
+                                        <th style={{ width: '15%' }}>Stock Status</th>
+                                        <th style={{ width: '5%' }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.map((item, index) => {
                                         const suggestions = getFilteredSuggestions(item.itemName);
-                                        const isOutOfStock = item.stock === 0 && item.itemName;
+                                        const isOutOfStock = item.stock === 0 && item.itemName && item.itemName.trim() !== "";
                                         const isLowStock = item.stock > 0 && item.stock <= 5;
 
                                         return (
@@ -490,11 +640,11 @@ const MyRequests = () => {
                                                             onChange={(e) => handleItemChange(index, "itemName", e.target.value)}
                                                             onFocus={() => handleFocus(index, item.itemName)}
                                                             onKeyDown={(e) => handleKeyDown(e, index, suggestions)}
-                                                            className={item.errors.itemName ? 'error' : ''}
+                                                            className={item.errors?.itemName ? 'error' : ''}
                                                             placeholder="Type item name..."
                                                             autoComplete="off"
                                                         />
-                                                        {item.errors.itemName && (
+                                                        {item.errors?.itemName && (
                                                             <span className="error-text">{item.errors.itemName}</span>
                                                         )}
                                                     </div>
@@ -506,11 +656,11 @@ const MyRequests = () => {
                                                         step="1"
                                                         value={item.quantity}
                                                         onChange={(e) => handleQuantityChange(index, e.target.value)}
-                                                        className={item.errors.quantity ? 'error' : ''}
+                                                        className={item.errors?.quantity ? 'error' : ''}
                                                         placeholder="0"
                                                         disabled={isOutOfStock}
                                                     />
-                                                    {item.errors.quantity && (
+                                                    {item.errors?.quantity && (
                                                         <span className="error-text">{item.errors.quantity}</span>
                                                     )}
                                                 </td>
@@ -518,19 +668,21 @@ const MyRequests = () => {
                                                     <select
                                                         value={item.unit}
                                                         onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                                                        className={item.errors.unit ? 'error' : ''}
+                                                        className={item.errors?.unit ? 'error' : ''}
                                                         disabled={isOutOfStock}
                                                     >
-                                                        <option value="">Select</option>
-                                                        <option value="piece">Piece</option>
-                                                        <option value="roll">Roll</option>
-                                                        <option value="ream">Ream</option>
-                                                        <option value="box">Box</option>
-                                                        <option value="pack">Pack</option>
-                                                        <option value="set">Set</option>
-                                                        <option value="bottle">Bottle</option>
+                                                        <option value="">Select Unit</option>
+                                                        <option value="piece">Piece(s)</option>
+                                                        <option value="roll">Roll(s)</option>
+                                                        <option value="ream">Ream(s)</option>
+                                                        <option value="box">Box(es)</option>
+                                                        <option value="pack">Pack(s)</option>
+                                                        <option value="set">Set(s)</option>
+                                                        <option value="bottle">Bottle(s)</option>
+                                                        <option value="bundle">Bundle(s)</option>
+                                                        <option value="pad">Pad(s)</option>
                                                     </select>
-                                                    {item.errors.unit && (
+                                                    {item.errors?.unit && (
                                                         <span className="error-text">{item.errors.unit}</span>
                                                     )}
                                                 </td>
@@ -541,15 +693,15 @@ const MyRequests = () => {
                                                     {formatCurrency(item.totalPrice)}
                                                 </td>
                                                 <td className="stock-status-cell">
-                                                    {item.itemName && (
-                                                        <div className={`stock-status ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}`}>
-                                                            {isOutOfStock ? (
+                                                    {item.itemName && item.itemName.trim() !== "" && item.stock !== undefined && (
+                                                        <div className={`stock-status ${item.stock === 0 ? 'out-of-stock' : item.stock <= 5 ? 'low-stock' : 'in-stock'}`}>
+                                                            {item.stock === 0 ? (
                                                                 <span className="status-text out">Out of Stock</span>
-                                                            ) : isLowStock ? (
+                                                            ) : item.stock <= 5 ? (
                                                                 <span className="status-text low">Low Stock ({item.stock} left)</span>
-                                                            ) : item.stock > 0 ? (
+                                                            ) : (
                                                                 <span className="status-text in">In Stock ({item.stock})</span>
-                                                            ) : null}
+                                                            )}
                                                         </div>
                                                     )}
                                                 </td>
@@ -559,8 +711,9 @@ const MyRequests = () => {
                                                             type="button"
                                                             onClick={() => removeItem(index)}
                                                             className="remove-btn"
+                                                            aria-label="Remove item"
                                                         >
-                                                            Remove
+                                                            ✕
                                                         </button>
                                                     )}
                                                 </td>
@@ -572,7 +725,7 @@ const MyRequests = () => {
                         </div>
 
                         <div className="add-item">
-                            <button type="button" onClick={addItem}>
+                            <button type="button" onClick={addItem} className="add-btn">
                                 + Add Another Item
                             </button>
                         </div>
@@ -580,7 +733,7 @@ const MyRequests = () => {
                         <div className="summary">
                             <div className="summary-row">
                                 <span>Total Amount:</span>
-                                <span>{formatCurrency(calculateOverallTotal())}</span>
+                                <span className="total-amount">{formatCurrency(calculateOverallTotal())}</span>
                             </div>
                         </div>
                     </div>
@@ -596,6 +749,7 @@ const MyRequests = () => {
                             onChange={(e) => setNotes(e.target.value)}
                             rows="4"
                             placeholder="Enter any additional notes here..."
+                            className="notes-textarea"
                         />
                     </div>
 
@@ -611,31 +765,38 @@ const MyRequests = () => {
                         </div>
                         <div className="stat">
                             <span>Overall Total</span>
-                            <strong>{formatCurrency(calculateOverallTotal())}</strong>
+                            <strong className="total-value">{formatCurrency(calculateOverallTotal())}</strong>
                         </div>
                     </div>
 
                     {/* Form Actions */}
                     <div className="actions">
-                        <button type="button" onClick={handleClear}>
+                        <button type="button" onClick={handleClear} className="clear-btn" disabled={submitting}>
                             Clear Form
                         </button>
-                        <button type="submit" disabled={submitting}>
-                            {submitting ? 'Submitting...' : 'Submit Requisition'}
+                        <button type="submit" disabled={submitting} className="submit-btn">
+                            {submitting ? (
+                                <>
+                                    <span className="spinner"></span>
+                                    Submitting...
+                                </>
+                            ) : (
+                                'Submit Requisition'
+                            )}
                         </button>
                     </div>
 
                     {/* Help Text */}
                     <div className="help">
-                        <p>Fields marked with * are required.</p>
-                        <p>Your request will be reviewed before processing.</p>
+                        <p>Fields marked with <span className="required">*</span> are required.</p>
+                        <p>Your request will be reviewed by the approver before processing.</p>
                         <p className="stock-note">Note: Items marked as "Out of Stock" cannot be requested.</p>
                     </div>
                 </form>
             </div>
 
-            {/* Global Suggestions Dropdown - Follows the input field on scroll */}
-            {showSuggestions !== null && getFilteredSuggestions(items[showSuggestions]?.itemName).length > 0 && (
+            {/* Global Suggestions Dropdown */}
+            {showSuggestions !== null && items[showSuggestions] && getFilteredSuggestions(items[showSuggestions]?.itemName).length > 0 && (
                 <div
                     ref={dropdownRef}
                     className="suggestions-dropdown-overlay"
@@ -650,11 +811,15 @@ const MyRequests = () => {
                     <ul className="suggestions-list">
                         {getFilteredSuggestions(items[showSuggestions]?.itemName).map((suggestion, idx) => (
                             <li
-                                key={suggestion._id}
+                                key={suggestion._id || suggestion.id || idx}
                                 className={activeSuggestionIndex === idx ? 'active' : ''}
                                 onClick={() => handleSelectSuggestion(showSuggestions, suggestion)}
                             >
-                                {suggestion.name || suggestion.itemName}
+                                <div className="suggestion-item">
+                                    <span className="suggestion-name">{suggestion.name || suggestion.itemName}</span>
+                                    <span className="suggestion-price">{formatCurrency(suggestion.unitPrice)}</span>
+                                    <span className="suggestion-stock">Stock: {suggestion.availableStock}</span>
+                                </div>
                             </li>
                         ))}
                     </ul>

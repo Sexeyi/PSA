@@ -59,6 +59,69 @@ const RequestApproval = () => {
         return null;
     }, []);
 
+    // Helper function to safely get unit price from item
+    const getItemUnitPrice = useCallback((item) => {
+        if (!item) return 0;
+        // Try different possible property names
+        const price = item.unitPrice || item.unit_price || item.price || item.unitPriceValue || 0;
+        return typeof price === 'number' ? price : parseFloat(price) || 0;
+    }, []);
+
+    // Helper function to safely get quantity from item
+    const getItemQuantity = useCallback((item) => {
+        if (!item) return 0;
+        const quantity = item.quantity || item.qty || item.quantityValue || 0;
+        return typeof quantity === 'number' ? quantity : parseFloat(quantity) || 0;
+    }, []);
+
+    // Helper function to calculate item total
+    const calculateItemTotal = useCallback((item) => {
+        if (!item) return 0;
+
+        // If totalPrice exists and is valid, use it
+        if (item.totalPrice && !isNaN(parseFloat(item.totalPrice)) && parseFloat(item.totalPrice) > 0) {
+            return parseFloat(item.totalPrice);
+        }
+        if (item.total && !isNaN(parseFloat(item.total)) && parseFloat(item.total) > 0) {
+            return parseFloat(item.total);
+        }
+
+        // Otherwise calculate from quantity and unit price
+        const quantity = getItemQuantity(item);
+        const unitPrice = getItemUnitPrice(item);
+        const calculatedTotal = quantity * unitPrice;
+
+        // Log for debugging
+        console.log('Calculating item total:', {
+            itemName: item.itemName,
+            quantity,
+            unitPrice,
+            calculatedTotal,
+            originalItem: item
+        });
+
+        return calculatedTotal;
+    }, [getItemQuantity, getItemUnitPrice]);
+
+    // Helper function to calculate requisition totals
+    const calculateRequisitionTotals = useCallback((req) => {
+        const items = req.items || [];
+        const totalQuantity = items.reduce((sum, item) => sum + getItemQuantity(item), 0);
+        const totalValue = items.reduce((sum, item) => {
+            const itemTotal = calculateItemTotal(item);
+            return sum + itemTotal;
+        }, 0);
+
+        console.log('Requisition totals:', {
+            requestId: req._id,
+            totalQuantity,
+            totalValue,
+            itemsCount: items.length
+        });
+
+        return { totalQuantity, totalValue };
+    }, [getItemQuantity, calculateItemTotal]);
+
     const fetchRequisitions = useCallback(async () => {
         try {
             setLoading(true);
@@ -76,6 +139,7 @@ const RequestApproval = () => {
             }
 
             const data = await response.json();
+            console.log('API Response:', data); // Debug log
 
             let requisitionsArray = [];
             if (data.data && Array.isArray(data.data)) {
@@ -101,8 +165,27 @@ const RequestApproval = () => {
                     requesterId = extractId(req.userId);
                 }
 
+                // Process items to ensure all numeric fields are correct
+                const processedItems = (req.items || []).map(item => ({
+                    ...item,
+                    quantity: getItemQuantity(item),
+                    unitPrice: getItemUnitPrice(item),
+                    totalPrice: calculateItemTotal(item)
+                }));
+
+                console.log('Processed items for request:', {
+                    requestId: req._id,
+                    items: processedItems.map(i => ({
+                        name: i.itemName,
+                        quantity: i.quantity,
+                        unitPrice: i.unitPrice,
+                        totalPrice: i.totalPrice
+                    }))
+                });
+
                 return {
                     ...req,
+                    items: processedItems,
                     requesterId: requesterId,
                     requesterName: requesterName,
                     department: req.department || requesterDepartment
@@ -153,7 +236,7 @@ const RequestApproval = () => {
         } finally {
             setLoading(false);
         }
-    }, [API_BASE_URL, extractId]);
+    }, [API_BASE_URL, extractId, getItemQuantity, getItemUnitPrice, calculateItemTotal]);
 
     useEffect(() => {
         fetchRequisitions();
@@ -287,11 +370,12 @@ const RequestApproval = () => {
     }, []);
 
     const formatCurrency = useCallback((amount) => {
+        const numAmount = Number(amount) || 0;
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'PHP',
             minimumFractionDigits: 2
-        }).format(amount || 0);
+        }).format(numAmount);
     }, []);
 
     const getStatusBadge = useCallback((status) => {
@@ -389,8 +473,7 @@ const RequestApproval = () => {
                     <>
                         <div className="requests-grid">
                             {paginatedRequests.map(req => {
-                                const totalQuantity = req.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-                                const totalValue = req.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
+                                const { totalQuantity, totalValue } = calculateRequisitionTotals(req);
                                 const isPending = req.status?.toLowerCase() === 'pending';
                                 const employeeDisplayId = getEmployeeDisplayId(req);
 
@@ -412,14 +495,14 @@ const RequestApproval = () => {
                                             <div className="items-preview">
                                                 <p className="items-label">Requested Items:</p>
                                                 <div className="items-list">
-                                                    {req.items?.slice(0, 2).map((item, idx) => (
+                                                    {(req.items || []).slice(0, 2).map((item, idx) => (
                                                         <div key={idx} className="item-row">
                                                             <span className="item-name">{item.itemName}</span>
-                                                            <span className="item-qty">{item.quantity} {item.unit || 'pcs'}</span>
+                                                            <span className="item-qty">{getItemQuantity(item)} {item.unit || 'pcs'}</span>
                                                         </div>
                                                     ))}
-                                                    {req.items?.length > 2 && (
-                                                        <p className="more-items">+{req.items.length - 2} more items</p>
+                                                    {(req.items || []).length > 2 && (
+                                                        <p className="more-items">+{(req.items || []).length - 2} more items</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -580,28 +663,34 @@ const RequestApproval = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {selectedRequest.items?.map((item, idx) => (
-                                                <tr key={idx}>
-                                                    <td className="item-name-cell">{item.itemName}</td>
-                                                    <td>{item.category || '—'}</td>
-                                                    <td>{item.unit || '—'}</td>
-                                                    <td className="text-right">{item.quantity}</td>
-                                                    <td className="text-right">{formatCurrency(item.unitPrice)}</td>
-                                                    <td className="text-right total-cell">{formatCurrency(item.totalPrice)}</td>
-                                                </tr>
-                                            ))}
+                                            {(selectedRequest.items || []).map((item, idx) => {
+                                                const quantity = getItemQuantity(item);
+                                                const unitPrice = getItemUnitPrice(item);
+                                                const itemTotal = calculateItemTotal(item);
+                                                return (
+                                                    <tr key={idx}>
+                                                        <td className="item-name-cell">{item.itemName}</td>
+                                                        <td>{item.category || '—'}</td>
+                                                        <td>{item.unit || '—'}</td>
+                                                        <td className="text-right">{quantity}</td>
+                                                        <td className="text-right">{formatCurrency(unitPrice)}</td>
+                                                        <td className="text-right total-cell">{formatCurrency(itemTotal)}</td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                         <tfoot>
-                                            <tr className="total-row">
-                                                <td colSpan="3" className="text-right">Totals:</td>
-                                                <td className="text-right">
-                                                    {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
-                                                </td>
-                                                <td className="text-right">—</td>
-                                                <td className="text-right total-value">
-                                                    {formatCurrency(selectedRequest.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0))}
-                                                </td>
-                                            </tr>
+                                            {(() => {
+                                                const { totalQuantity, totalValue } = calculateRequisitionTotals(selectedRequest);
+                                                return (
+                                                    <tr className="total-row">
+                                                        <td colSpan="3" className="text-right">Totals:</td>
+                                                        <td className="text-right">{totalQuantity}</td>
+                                                        <td className="text-right">—</td>
+                                                        <td className="text-right total-value">{formatCurrency(totalValue)}</td>
+                                                    </tr>
+                                                );
+                                            })()}
                                         </tfoot>
                                     </table>
                                 </div>
@@ -663,7 +752,13 @@ const RequestApproval = () => {
                                 <div className="approve-details">
                                     <span className="approve-label">Total Quantity:</span>
                                     <span className="approve-value">
-                                        {selectedRequest.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                                        {selectedRequest.items?.reduce((sum, item) => sum + getItemQuantity(item), 0) || 0}
+                                    </span>
+                                </div>
+                                <div className="approve-details">
+                                    <span className="approve-label">Total Value:</span>
+                                    <span className="approve-value">
+                                        {formatCurrency(selectedRequest.items?.reduce((sum, item) => sum + calculateItemTotal(item), 0) || 0)}
                                     </span>
                                 </div>
                             </div>
@@ -715,6 +810,12 @@ const RequestApproval = () => {
                                 <div className="reject-details">
                                     <span className="reject-label">Employee ID:</span>
                                     <span className="reject-value">{getEmployeeDisplayId(selectedRequest)}</span>
+                                </div>
+                                <div className="reject-details">
+                                    <span className="reject-label">Total Value:</span>
+                                    <span className="reject-value">
+                                        {formatCurrency(selectedRequest.items?.reduce((sum, item) => sum + calculateItemTotal(item), 0) || 0)}
+                                    </span>
                                 </div>
                             </div>
 

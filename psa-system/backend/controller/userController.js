@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const fs = require('fs');
+const path = require('path');
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -93,8 +95,8 @@ const createUser = async (req, res) => {
         }
 
         // Check SuperAdmin constraint
-        if (role === 'SuperAdmin') {
-            const existingSuperAdmin = await User.findOne({ role: 'SuperAdmin' });
+        if (role === 'superadmin') {
+            const existingSuperAdmin = await User.findOne({ role: 'superadmin' });
             if (existingSuperAdmin) {
                 console.log('❌ SuperAdmin already exists');
                 return res.status(400).json({
@@ -110,8 +112,9 @@ const createUser = async (req, res) => {
             employeeId,
             email: email.toLowerCase(),
             department,
-            role,
-            password
+            role: role.toLowerCase(),
+            password,
+            profilePicture: null
         });
 
         await user.save();
@@ -176,7 +179,7 @@ const updateUser = async (req, res) => {
         }
 
         // Check if user is trying to modify SuperAdmin
-        if (user.role === 'SuperAdmin' && req.user.role !== 'SuperAdmin') {
+        if (user.role === 'superadmin' && req.user.role !== 'superadmin') {
             return res.status(403).json({
                 success: false,
                 message: 'Only SuperAdmin can modify SuperAdmin accounts'
@@ -184,8 +187,8 @@ const updateUser = async (req, res) => {
         }
 
         // Check SuperAdmin constraint if role is being changed to SuperAdmin
-        if (role === 'SuperAdmin' && user.role !== 'SuperAdmin') {
-            const existingSuperAdmin = await User.findOne({ role: 'SuperAdmin' });
+        if (role && role.toLowerCase() === 'superadmin' && user.role !== 'superadmin') {
+            const existingSuperAdmin = await User.findOne({ role: 'superadmin' });
             if (existingSuperAdmin && existingSuperAdmin._id.toString() !== user._id.toString()) {
                 return res.status(400).json({
                     success: false,
@@ -221,7 +224,7 @@ const updateUser = async (req, res) => {
         if (fullName) user.fullName = fullName;
         if (email) user.email = email.toLowerCase();
         if (department) user.department = department;
-        if (role) user.role = role;
+        if (role) user.role = role.toLowerCase();
         if (password) user.password = password; // Will be hashed by pre-save hook
 
         user.updatedAt = Date.now();
@@ -258,6 +261,154 @@ const updateUser = async (req, res) => {
     }
 };
 
+// @desc    Upload profile picture
+// @route   PUT /api/users/:id/profile-picture
+// @access  Private
+const uploadProfilePicture = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        console.log('📸 Uploading profile picture for user:', userId);
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if user is updating their own profile picture or is superadmin
+        if (req.user._id.toString() !== userId && req.user.role !== 'superadmin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized to update this user\'s profile picture'
+            });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No file uploaded'
+            });
+        }
+
+        // Delete old profile picture if exists
+        if (user.profilePicture) {
+            const oldPath = path.join(__dirname, '..', user.profilePicture);
+            if (fs.existsSync(oldPath)) {
+                fs.unlinkSync(oldPath);
+                console.log('🗑️ Deleted old profile picture');
+            }
+        }
+
+        // Update user with new profile picture path
+        user.profilePicture = `/uploads/profile-pictures/${req.file.filename}`;
+        await user.save();
+
+        console.log('✅ Profile picture uploaded successfully');
+
+        res.json({
+            success: true,
+            message: 'Profile picture updated successfully',
+            profilePicture: user.profilePicture
+        });
+    } catch (error) {
+        console.error('❌ Error uploading profile picture:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error uploading profile picture',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Remove profile picture
+// @route   DELETE /api/users/:id/profile-picture
+// @access  Private
+const removeProfilePicture = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        console.log('🗑️ Removing profile picture for user:', userId);
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if user is updating their own profile picture or is superadmin
+        if (req.user._id.toString() !== userId && req.user.role !== 'superadmin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized to update this user\'s profile picture'
+            });
+        }
+
+        // Delete old profile picture if exists
+        if (user.profilePicture) {
+            const oldPath = path.join(__dirname, '..', user.profilePicture);
+            if (fs.existsSync(oldPath)) {
+                fs.unlinkSync(oldPath);
+                console.log('🗑️ Deleted profile picture');
+            }
+        }
+
+        user.profilePicture = null;
+        await user.save();
+
+        console.log('✅ Profile picture removed successfully');
+
+        res.json({
+            success: true,
+            message: 'Profile picture removed successfully'
+        });
+    } catch (error) {
+        console.error('❌ Error removing profile picture:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error removing profile picture',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get profile picture
+// @route   GET /api/users/:id/profile-picture
+// @access  Private
+const getProfilePicture = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        console.log('📸 Getting profile picture for user:', userId);
+
+        const user = await User.findById(userId);
+        if (!user || !user.profilePicture) {
+            return res.status(404).json({
+                success: false,
+                message: 'Profile picture not found'
+            });
+        }
+
+        const imagePath = path.join(__dirname, '..', user.profilePicture);
+        if (!fs.existsSync(imagePath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Image file not found'
+            });
+        }
+
+        res.sendFile(imagePath);
+    } catch (error) {
+        console.error('❌ Error getting profile picture:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error getting profile picture',
+            error: error.message
+        });
+    }
+};
+
 // @desc    Delete user
 // @route   DELETE /api/users/:id
 // @access  Private (SuperAdmin only)
@@ -276,7 +427,7 @@ const deleteUser = async (req, res) => {
         }
 
         // Prevent deletion of SuperAdmin
-        if (user.role === 'SuperAdmin') {
+        if (user.role === 'superadmin') {
             console.log('❌ Attempted to delete SuperAdmin');
             return res.status(400).json({
                 success: false,
@@ -290,6 +441,15 @@ const deleteUser = async (req, res) => {
                 success: false,
                 message: 'You cannot delete your own account'
             });
+        }
+
+        // Delete profile picture if exists
+        if (user.profilePicture) {
+            const imagePath = path.join(__dirname, '..', user.profilePicture);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+                console.log('🗑️ Deleted profile picture');
+            }
         }
 
         await User.findByIdAndDelete(req.params.id);
@@ -337,15 +497,14 @@ const updateUserStatus = async (req, res) => {
         }
 
         // Prevent status change of SuperAdmin by non-SuperAdmin
-        if (user.role === 'SuperAdmin' && req.user.role !== 'SuperAdmin') {
+        if (user.role === 'superadmin' && req.user.role !== 'superadmin') {
             return res.status(403).json({
                 success: false,
                 message: 'Only SuperAdmin can modify SuperAdmin status'
             });
         }
 
-        // Update status (you'll need to add status field to your schema)
-        // user.status = status;
+        user.status = status;
         user.updatedAt = Date.now();
         await user.save();
 
@@ -373,5 +532,8 @@ module.exports = {
     createUser,
     updateUser,
     deleteUser,
-    updateUserStatus
+    updateUserStatus,
+    uploadProfilePicture,
+    removeProfilePicture,
+    getProfilePicture
 };

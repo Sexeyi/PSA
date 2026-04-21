@@ -42,13 +42,7 @@ export default function EmployeeDashboard() {
                 throw new Error("No authentication token found");
             }
 
-            // Get user ID from localStorage
-            const userData = localStorage.getItem('user');
-            const currentUser = JSON.parse(userData);
-            const userId = currentUser?.id || currentUser?._id;
-
-            // Fetch requisitions with user filter
-            const response = await fetch(`http://localhost:5000/api/requisitions/user/${userId}`, {
+            const response = await fetch(`http://localhost:5000/api/requisitions`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -58,10 +52,6 @@ export default function EmployeeDashboard() {
             if (!response.ok) {
                 if (response.status === 401) {
                     throw new Error("Unauthorized. Please login again.");
-                }
-                if (response.status === 404) {
-                    setRequisitions([]);
-                    return;
                 }
                 throw new Error(`Failed to fetch requisitions: ${response.status}`);
             }
@@ -77,14 +67,21 @@ export default function EmployeeDashboard() {
                 requisitionsArray = data.requisitions;
             }
 
-            setRequisitions(requisitionsArray);
+            // Filter requisitions for the current user
+            const userId = user?.id || user?._id;
+            const userRequisitions = requisitionsArray.filter(req => {
+                const reqUserId = req.userId || req.user_id || req.user?.id || req.user?._id;
+                return reqUserId === userId;
+            });
+
+            setRequisitions(userRequisitions);
         } catch (error) {
             console.error("Fetch requisitions error:", error);
             setError(error.message || 'Failed to load your requisitions. Please try again.');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         if (user) {
@@ -252,6 +249,7 @@ export default function EmployeeDashboard() {
     const getTotalAmount = (request) => {
         if (request.totalPrice) return request.totalPrice;
         if (request.total_amount) return request.total_amount;
+        if (request.overallTotal) return request.overallTotal;
         if (request.items && request.items.length) {
             return request.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         }
